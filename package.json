@@ -1,0 +1,44 @@
+{
+  "name": "momento_be",
+  "version": "1.0.0",
+  "description": "Day counter &amp; reminder app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:generate": "npm run typeorm -- migration:generate -d src/infrastructure/database/data-source.ts",
+    "migration:create": "npm run typeorm -- migration:create",
+    "migration:run": "npm run typeorm -- migration:run -d src/infrastructure/database/data-source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/infrastructure/database/data-source.ts",
+    "migration:run:prod": "typeorm migration:run -d dist/infrastructure/database/data-source.js",
+    "start:dev": "nest start --watch",
+    "start:prod": "npm run migration:run:prod && node dist/main",
+    "build": "nest build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@nestjs/apollo": "^13.0.4",
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/graphql": "^13.0.4",
+    "@nestjs/platform-express": "^11.0.12",
+    "@nestjs/typeorm": "^11.0.0",
+    "apollo-server-express": "^3.13.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "dotenv": "^16.4.7",
+    "graphql": "^16.10.0",
+    "graphql-tools": "^9.0.18",
+    "pg": "^8.14.1",
+    "rxjs": "^7.8.2",
+    "typeorm": "^0.3.21"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.5",
+    "@types/node": "^22.13.14",
+    "ts-node": "^10.9.2"
+  }
+}
