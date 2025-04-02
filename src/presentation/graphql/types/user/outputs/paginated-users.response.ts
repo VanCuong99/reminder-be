@@ -1,23 +1,6 @@
-import { ObjectType, Field, Int } from '@nestjs/graphql';
+import { ObjectType } from '@nestjs/graphql';
 import { UserType } from './user.type';
+import { Paginated } from '../../../../../shared/types/graphql/outputs/pagination.response';
 
 @ObjectType()
-export class PaginatedUsersResponse {
-    @Field(() => [UserType])
-    items: UserType[];
-
-    @Field(() => Int)
-    total: number;
-
-    @Field(() => Int)
-    page: number;
-
-    @Field(() => Int)
-    totalPages: number;
-
-    @Field(() => Boolean)
-    hasNext: boolean;
-
-    @Field(() => Boolean)
-    hasPrevious: boolean;
-} 
+export class PaginatedUsersResponse extends Paginated(UserType) { } 

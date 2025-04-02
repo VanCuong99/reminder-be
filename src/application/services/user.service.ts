@@ -5,7 +5,7 @@ import { User } from '../../domain/entities/user.entity';
 import { CreateUserInput } from '../../presentation/graphql/types/user/inputs/create-user.input';
 import { UserType } from '../../presentation/graphql/types/user/outputs/user.type';
 import { PaginationInput } from '../../shared/types/graphql/inputs/pagination.input';
-import { PaginatedUsersResponse } from '../../presentation/graphql/types/user/outputs/paginated-users.response';
+import { IPaginatedType } from '../../shared/types/graphql/outputs/pagination.response';
 
 @Injectable()
 export class UserService {
@@ -14,7 +14,7 @@ export class UserService {
         private readonly userRepository: Repository<User>,
     ) { }
 
-    async findAll(pagination?: PaginationInput): Promise<PaginatedUsersResponse> {
+    async findAll(pagination?: PaginationInput): Promise<IPaginatedType<UserType>> {
         const { page = 1, limit = 10, sortBy = 'createdAt', sortDirection = 'DESC' } = pagination || {};
 
         const skip = (page - 1) * limit;
