@@ -9,6 +9,7 @@ Day counter & reminder application built with NestJS, GraphQL, TypeORM, and Post
 - **Database**: PostgreSQL v15 with TypeORM v0.3
 - **Container**: Docker & Docker Compose
 - **Language**: TypeScript v5
+- **Package Manager**: pnpm v8
 
 ## Features
 
@@ -48,16 +49,110 @@ src/
 
 ## Prerequisites
 
-- Node.js (v20+)
+- Node.js v20.11.1 (LTS)
+- pnpm v8.15.4
 - Docker & Docker Compose
-- PostgreSQL
+- PostgreSQL v15
 
-## Installation
+## Development Setup
+
+### Node.js Version
+
+This project uses Node.js v20.11.1. We recommend using nvm (Node Version Manager) to manage Node.js versions:
+
+```bash
+# Install specific Node.js version
+nvm install 20.11.1
+
+# Use the installed version
+nvm use 20.11.1
+```
+
+### Installation
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 ```
+
+## Git Conventions
+
+### Branch Naming Convention
+
+Branches should be named using the following format:
+
+```
+<type>/<ticket-number>-<short-description>
+```
+
+Types:
+
+- `feature/` - New features
+- `bugfix/` - Bug fixes
+- `hotfix/` - Critical fixes for production
+- `refactor/` - Code refactoring
+- `chore/` - Maintenance tasks
+- `test/` - Test-related changes
+- `docs/` - Documentation updates
+
+Examples:
+
+```
+feature/MOM-123-add-user-authentication
+bugfix/MOM-124-fix-date-calculation
+refactor/MOM-125-improve-error-handling
+```
+
+### Commit Message Convention
+
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+Types:
+
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, missing semi colons, etc)
+- `refactor`: Code refactoring
+- `test`: Adding missing tests
+- `chore`: Maintenance tasks
+- `perf`: Performance improvements
+- `ci`: CI/CD related changes
+
+Examples:
+
+```
+feat(auth): implement JWT authentication
+fix(date): correct date calculation logic
+docs(readme): update installation instructions
+refactor(user): improve error handling in user service
+```
+
+Scope (optional):
+
+- auth
+- user
+- reminder
+- date
+- db
+- config
+- etc.
+
+Guidelines:
+
+- Use imperative mood in description ("add" not "added")
+- Don't capitalize first letter
+- No period at the end
+- Keep description under 72 characters
+- Describe what the change does, not what you did
 
 ## Environment Setup
 
@@ -107,20 +202,20 @@ NODE_ENV=development
 docker-compose up
 
 # Run locally
-npm run start:dev
+pnpm run start:dev
 ```
 
 ### Database Migrations
 
 ```bash
 # Generate migration
-npm run migration:generate src/infrastructure/database/migrations/[MigrationName]
+pnpm run migration:generate src/infrastructure/database/migrations/[MigrationName]
 
 # Run migrations
-npm run migration:run
+pnpm run migration:run
 
 # Revert migrations
-npm run migration:revert
+pnpm run migration:revert
 ```
 
 ## Deployment
@@ -142,10 +237,10 @@ docker-compose down
 
 ```bash
 # Build application
-npm run build
+pnpm run build
 
 # Start production server
-npm run start:prod
+pnpm run start:prod
 ```
 
 ## API Documentation
