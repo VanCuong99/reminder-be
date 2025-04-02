@@ -2,26 +2,77 @@
 
 Day counter & reminder application built with NestJS, GraphQL, TypeORM, and PostgreSQL.
 
+## Table of Contents
+
+- [Technologies](#technologies)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Development Setup](#development-setup)
+- [Git Conventions](#git-conventions)
+- [API Documentation](#api-documentation)
+- [Testing](#testing)
+- [Deployment](#deployment)
+
 ## Technologies
 
-- **Framework**: NestJS v11
-- **API**: GraphQL v16 with Apollo Server
-- **Database**: PostgreSQL v15 with TypeORM v0.3
+- **Core Framework**: NestJS v11
+- **API Layer**: GraphQL v16 with Apollo Server
+- **Database**: PostgreSQL v15
+- **ORM**: TypeORM v0.3
 - **Container**: Docker & Docker Compose
 - **Language**: TypeScript v5
 - **Package Manager**: pnpm v8
+- **Testing**: Jest
+- **Documentation**: GraphQL Playground
 
 ## Features
 
-- User Management
-  - User registration
-  - User authentication (coming soon)
-- Day Counter
+### User Management
+
+- Authentication & Authorization
+  - User registration with validation
+  - JWT-based authentication
+  - Role-based access control (coming soon)
+- User Operations
+  - CRUD operations for users
+  - Advanced user search
+  - Paginated user queries with sorting
+  - Profile management
+
+### Data Management
+
+- Generic Pagination Support
+  - Configurable page size
+  - Dynamic sorting options
+  - Total count tracking
+  - Page information (prev/next)
+- Type-safe GraphQL Implementation
+  - Strong typing with TypeScript
+  - Input validation
+  - Error handling
+  - Response formatting
+
+### Day Counter (In Progress)
+
+- Event Tracking
   - Create and manage important dates
-  - Track days until/since specific events
-- Reminders (coming soon)
-  - Set up custom reminders
-  - Notification system
+  - Calculate days until/since events
+  - Recurring events support
+- Customization
+  - Event categories
+  - Custom reminders
+  - Notification preferences
+
+### Coming Soon
+
+- Reminder System
+  - Custom notification rules
+  - Multiple notification channels
+  - Scheduling system
+- Social Features
+  - Friend connections
+  - Shared events
+  - Activity feed
 
 ## Project Structure
 
@@ -47,37 +98,34 @@ src/
 | ├── constants/ # Constants and enums
 | └── utils/ # Utility functions
 
-## Prerequisites
+## Development Setup
+
+### Prerequisites
 
 - Node.js v20.11.1 (LTS)
 - pnpm v8.15.4
 - Docker & Docker Compose
 - PostgreSQL v15
 
-## Development Setup
-
-### Node.js Version
-
-This project uses Node.js v20.11.1. We recommend using nvm (Node Version Manager) to manage Node.js versions:
+### Installation Steps
 
 ```bash
 # Install specific Node.js version
 nvm install 20.11.1
 
-# Use the installed version
-nvm use 20.11.1
-```
-
-### Installation
-
-```bash
 # Install dependencies
 pnpm install
 ```
 
-## Git Conventions
+# Setup environment
 
-### Branch Naming Convention
+cp .env.example .env
+
+# Start development server
+
+pnpm run start:dev
+
+````
 
 Branches should be named using the following format:
 
@@ -160,70 +208,98 @@ Create a `.env` file in the root directory:
 
 ```env
 # Database Configuration
-DB_HOST=localhost          # Use 'postgres' for Docker
+DB_HOST=localhost
 DB_PORT=5432
 DB_USERNAME=postgres
 DB_PASSWORD=123
 DB_NAME=momentobe
-DEFAULT_DB=postgres       # For database creation script
+DEFAULT_DB=postgres
 
 # Application Configuration
 PORT=3001
 NODE_ENV=development
+JWT_SECRET=your-secret-key
 ```
 
-## Development Guide
+## Testing
 
-### Code Style
+### Test Structure
 
-- Follow NestJS best practices
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Keep functions small and focused
-
-### Testing (Coming Soon)
-
-- Unit tests with Jest
-- E2E tests with Supertest
-- GraphQL testing
-
-### Error Handling
-
-- Use custom exception filters
-- Proper error messages and codes
-- Validation using class-validator
-
-## Running the Application
-
-### Development
-
-```bash
-# Run with Docker
-docker-compose up
-
-# Run locally
-pnpm run start:dev
+```
+tests/
+├── unit/              # Unit tests
+│   ├── resolvers/    # Resolver tests
+│   └── services/     # Service tests
+├── integration/      # Integration tests
+└── e2e/             # End-to-end tests
 ```
 
-### Database Migrations
+### Running Tests
 
 ```bash
-# Generate migration
-pnpm run migration:generate src/infrastructure/database/migrations/[MigrationName]
+# Run all tests
+pnpm run test
 
-# Run migrations
-pnpm run migration:run
+# Run specific test file
+pnpm run test src/path/to/test/file
 
-# Revert migrations
-pnpm run migration:revert
+# Run tests with coverage
+pnpm run test:cov
+
+# Run e2e tests
+pnpm run test:e2e
+```
+
+### Test Coverage Goals
+
+- Unit Tests: 80%+ coverage
+- Integration Tests: Key workflows
+- E2E Tests: Critical user journeys
+
+## API Documentation
+
+### GraphQL Playground
+
+- Development: http://localhost:3001/graphql
+- Docker: http://localhost:3002/graphql
+
+### Sample Queries
+
+```graphql
+# Get paginated users
+query {
+  users(pagination: { page: 1, limit: 10, sortBy: "createdAt", sortDirection: "DESC" }) {
+    items {
+      id
+      username
+      email
+      createdAt
+    }
+    total
+    page
+    totalPages
+    hasNext
+    hasPrevious
+  }
+}
+
+# Create new user
+mutation {
+  createUser(input: { username: "testuser", email: "test@example.com", password: "password123" }) {
+    id
+    username
+    email
+    createdAt
+  }
+}
 ```
 
 ## Deployment
 
-### Docker
+### Docker Deployment
 
 ```bash
-# Build and run containers
+# Build and start containers
 docker-compose up --build
 
 # Run in detached mode
@@ -233,7 +309,7 @@ docker-compose up -d
 docker-compose down
 ```
 
-### Production
+### Production Deployment
 
 ```bash
 # Build application
@@ -243,21 +319,11 @@ pnpm run build
 pnpm run start:prod
 ```
 
-## API Documentation
-
-GraphQL Playground is available at:
-
-- Docker: http://localhost:3002/graphql
-- Local: http://localhost:3001/graphql
-
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## License
 
-ISC
+This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
+````
