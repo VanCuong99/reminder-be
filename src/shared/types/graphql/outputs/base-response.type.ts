@@ -10,4 +10,4 @@ export class BaseResponse {
 
     @Field({ nullable: true })
     error?: string;
-} 
+}

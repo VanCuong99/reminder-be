@@ -9,4 +9,4 @@ import { UserResolver } from './graphql/resolvers/user.resolver';
     providers: [UserService, UserResolver],
     exports: [UserService],
 })
-export class UserModule { } 
+export class UserModule {}

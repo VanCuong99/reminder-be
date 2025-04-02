@@ -205,7 +205,10 @@ describe('UserService', () => {
 
             expect(result).toEqual({ ...existingUser, password: hashedPassword });
             expect(bcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
-            expect(repository.save).toHaveBeenCalledWith({ ...existingUser, password: hashedPassword });
+            expect(repository.save).toHaveBeenCalledWith({
+                ...existingUser,
+                password: hashedPassword,
+            });
         });
 
         it('should throw NotFoundException when updating non-existent user', async () => {

@@ -19,4 +19,4 @@ const dataSource = new DataSource({
     logging: true,
 });
 
-export default dataSource; 
+export default dataSource;

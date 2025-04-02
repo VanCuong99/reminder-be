@@ -19,4 +19,4 @@ export class UpdateUserInput {
     @IsString()
     @Length(6, 100)
     password?: string;
-} 
+}

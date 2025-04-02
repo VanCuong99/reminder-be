@@ -16,4 +16,4 @@ export class UserType {
 
     @Field()
     createdAt: Date;
-} 
+}

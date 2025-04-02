@@ -29,7 +29,7 @@ async function createDatabase() {
 
         // Kiểm tra database có tồn tại không (không phân biệt chữ hoa/thường)
         const databases = await queryRunner.query(
-            `SELECT datname FROM pg_database WHERE LOWER(datname) = LOWER('${databaseName}')`
+            `SELECT datname FROM pg_database WHERE LOWER(datname) = LOWER('${databaseName}')`,
         );
 
         if (databases.length === 0) {
@@ -82,4 +82,4 @@ async function createDatabase() {
     }
 }
 
-createDatabase(); 
+createDatabase();

@@ -51,8 +51,18 @@ describe('UserResolver', () => {
 
             const paginatedResult = {
                 items: [
-                    { id: '1', username: 'test1', email: 'test1@example.com', createdAt: new Date() },
-                    { id: '2', username: 'test2', email: 'test2@example.com', createdAt: new Date() },
+                    {
+                        id: '1',
+                        username: 'test1',
+                        email: 'test1@example.com',
+                        createdAt: new Date(),
+                    },
+                    {
+                        id: '2',
+                        username: 'test2',
+                        email: 'test2@example.com',
+                        createdAt: new Date(),
+                    },
                 ],
                 total: 2,
                 page: 1,
@@ -142,8 +152,8 @@ describe('UserResolver', () => {
 
         it('should handle validation errors in create', async () => {
             const invalidInput: CreateUserInput = {
-                username: '',  // invalid username
-                email: 'invalid-email',  // invalid email
+                username: '', // invalid username
+                email: 'invalid-email', // invalid email
                 password: '123', // invalid password
             };
 
@@ -240,23 +250,23 @@ describe('UserResolver', () => {
                 new NotFoundException(`User with ID "${nonExistentId}" not found`),
             );
 
-            await expect(resolver.updateUser(nonExistentId, updateUserInput))
-                .rejects
-                .toThrow(NotFoundException);
+            await expect(resolver.updateUser(nonExistentId, updateUserInput)).rejects.toThrow(
+                NotFoundException,
+            );
             expect(userService.update).toHaveBeenCalledWith(nonExistentId, updateUserInput);
         });
 
         it('should handle validation errors in update', async () => {
             const invalidInput: UpdateUserInput = {
-                email: 'invalid-email',  // invalid email format
+                email: 'invalid-email', // invalid email format
             };
 
             mockUserService.update.mockRejectedValue(new Error('Validation failed'));
 
-            await expect(resolver.updateUser(userId, invalidInput))
-                .rejects
-                .toThrow('Validation failed');
+            await expect(resolver.updateUser(userId, invalidInput)).rejects.toThrow(
+                'Validation failed',
+            );
             expect(userService.update).toHaveBeenCalledWith(userId, invalidInput);
         });
     });
-}); 
+});

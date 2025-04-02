@@ -13,17 +13,22 @@ export class UserService {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
-    ) { }
+    ) {}
 
     async findAll(pagination?: PaginationInput): Promise<IPaginatedType<User>> {
-        const { page = 1, limit = 10, sortBy = 'createdAt', sortDirection = 'DESC' } = pagination || {};
+        const {
+            page = 1,
+            limit = 10,
+            sortBy = 'createdAt',
+            sortDirection = 'DESC',
+        } = pagination || {};
 
         const skip = (page - 1) * limit;
 
         const [items, total] = await this.userRepository.findAndCount({
             skip,
             take: limit,
-            order: { [sortBy]: sortDirection }
+            order: { [sortBy]: sortDirection },
         });
 
         const totalPages = Math.ceil(total / limit);
@@ -34,7 +39,7 @@ export class UserService {
             page,
             totalPages,
             hasNext: page < totalPages,
-            hasPrevious: page > 1
+            hasPrevious: page > 1,
         };
     }
 
@@ -68,4 +73,4 @@ export class UserService {
 
         return this.userRepository.save(user);
     }
-} 
+}

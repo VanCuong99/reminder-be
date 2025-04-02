@@ -8,11 +8,11 @@ import { PaginatedUsersResponse } from '../types/user/outputs/paginated-users.re
 
 @Resolver(() => UserType)
 export class UserResolver {
-    constructor(private readonly userService: UserService) { }
+    constructor(private readonly userService: UserService) {}
 
     @Query(() => PaginatedUsersResponse)
     async users(
-        @Args('pagination', { nullable: true }) pagination?: PaginationInput
+        @Args('pagination', { nullable: true }) pagination?: PaginationInput,
     ): Promise<PaginatedUsersResponse> {
         return this.userService.findAll(pagination);
     }
@@ -30,8 +30,8 @@ export class UserResolver {
     @Mutation(() => UserType)
     async updateUser(
         @Args('id') id: string,
-        @Args('input') updateUserInput: UpdateUserInput
+        @Args('input') updateUserInput: UpdateUserInput,
     ): Promise<UserType> {
         return this.userService.update(id, updateUserInput);
     }
-} 
+}
