@@ -126,6 +126,66 @@ cp .env.example .env
 pnpm run start:dev
 
 ````
+## Code Quality & CI/CD
+
+### Code Quality Tools
+
+- **ESLint**: JavaScript/TypeScript linting
+- **Prettier**: Code formatting
+- **SonarQube**: Code quality and security analysis
+- **Husky**: Git hooks for code quality checks
+- **lint-staged**: Run linters on git staged files
+
+### Quality Standards
+
+- Minimum test coverage: 80%
+- Zero critical or blocker issues
+- No code smells
+- No security hotspots
+- Maximum duplicated lines: 3%
+
+### CI/CD Pipeline
+
+Our GitHub Actions workflow includes:
+
+1. **Code Quality**
+   - ESLint check
+   - Prettier check
+   - Unit tests with coverage
+   - SonarQube analysis
+
+2. **Pre-commit Checks**
+   - Code formatting
+   - Linting
+   - Unit tests
+   - Type checking
+
+### SonarQube Integration
+
+SonarQube is configured to analyze:
+- Code quality
+- Test coverage
+- Code duplication
+- Security vulnerabilities
+- Code smells
+
+Access the SonarQube dashboard at: `[Your SonarQube URL]`
+
+### Running Quality Checks Locally
+
+```bash
+# Format code
+pnpm run format
+
+# Lint code
+pnpm run lint
+
+# Run tests with coverage
+pnpm run test:cov
+
+# Run all checks (pre-commit)
+pnpm run pre-commit
+```
 
 Branches should be named using the following format:
 

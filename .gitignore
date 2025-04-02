@@ -9,10 +9,12 @@ node_modules/
 
 # Compiled output
 /dist
+/build
 
 # Environment
 .env
 .env.*
+!.env.example
 
 # Logs
 logs
@@ -26,6 +28,17 @@ Thumbs.db
 
 # Generated files
 schema.gql
+/coverage
+/.nyc_output
+/.scannerwork
 
 # Docker
 docker-compose.override.yml
+
+# Test
+/test/coverage
+/coverage
+*.lcov
+
+# SonarQube
+.scannerwork/
