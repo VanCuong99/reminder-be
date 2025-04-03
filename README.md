@@ -65,15 +65,6 @@ Day counter & reminder application built with NestJS, GraphQL, TypeORM, and Post
 
 ### Coming Soon
 
-- Reminder System
-    - Custom notification rules
-    - Multiple notification channels
-    - Scheduling system
-- Social Features
-    - Friend connections
-    - Shared events
-    - Activity feed
-
 ## Project Structure
 
 src/
