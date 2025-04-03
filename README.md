@@ -116,48 +116,7 @@ cp .env.example .env
 
 pnpm run start:dev
 
-## Development
-
-### Running GitHub Actions Locally
-
-You can run GitHub Actions workflows locally using [act](https://github.com/nektos/act):
-
-1. Install Docker Desktop (required for act)
-
-2. Install act:
-
-    ```bash
-    # Windows
-    # First install scoop (Windows package manager)
-    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-    irm get.scoop.sh | iex
-
-    # Then install act
-    scoop install act
-
-    # macOS (using Homebrew)
-    brew install act
-
-    # Linux (using apt)
-    curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
-    ```
-
-3. Run the CI workflow locally:
-
-    ```bash
-    # List available workflows
-    act -l
-
-    # Run the CI workflow
-    act -W .github/workflows/ci.yml
-    ```
-
-    Note: Some secrets may need to be provided:
-
-    ```bash
-    act -W .github/workflows/ci.yml -s SONAR_TOKEN=your_token -s SONAR_HOST_URL=your_url
-    ```
-
+````
 ## Code Quality & CI/CD
 
 ### Code Quality Tools
@@ -181,17 +140,15 @@ You can run GitHub Actions workflows locally using [act](https://github.com/nekt
 Our GitHub Actions workflow includes:
 
 1. **Code Quality**
-
-    - ESLint check
-    - Prettier check
-    - Unit tests with coverage
-    - SonarQube analysis
+   - Prettier check
+   - Unit tests with coverage
+   - SonarQube analysis
 
 2. **Pre-commit Checks**
-    - Code formatting
-    - Linting
-    - Unit tests
-    - Type checking
+   - Code formatting
+   - Linting
+   - Unit tests
+   - Type checking
 
 ### SonarQube Integration
 
@@ -470,3 +427,4 @@ Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of
 ## License
 
 This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
+````
