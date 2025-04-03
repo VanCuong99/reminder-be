@@ -286,12 +286,32 @@ JWT_SECRET=your-secret-key
 ### Test Structure
 
 ```
-tests/
-├── unit/              # Unit tests
-│   ├── resolvers/    # Resolver tests
-│   └── services/     # Service tests
-├── integration/      # Integration tests
-└── e2e/             # End-to-end tests
+src/
+├── application/
+│   ├── services/
+│   │   ├── auth/
+│   │   │   └── auth.service.spec.ts
+│   │   ├── base/
+│   │   │   └── base.service.spec.ts
+│   │   └── users/
+│   │       └── user.service.spec.ts
+│   └── interfaces/
+├── infrastructure/
+│   ├── auth/
+│   │   ├── decorators/
+│   │   │   └── current-user.decorator.spec.ts
+│   │   ├── guards/
+│   │   │   ├── jwt-auth.guard.spec.ts
+│   │   │   └── roles.guard.spec.ts
+│   │   └── strategies/
+│   │       └── jwt.strategy.spec.ts
+│   └── database/
+├── presentation/
+│   └── graphql/
+│       └── resolvers/
+│           ├── auth.resolver.spec.ts
+│           └── user.resolver.spec.ts
+└── shared/
 ```
 
 ### Running Tests
