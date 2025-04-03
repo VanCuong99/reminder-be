@@ -7,40 +7,19 @@ import { UpdateUserInput } from '../../presentation/graphql/types/user/inputs/up
 import { PaginationInput } from '../../shared/types/graphql/inputs/pagination.input';
 import { IPaginatedType } from '../../shared/types/graphql/outputs/pagination.response';
 import * as bcrypt from 'bcryptjs';
+import { BaseService } from './base.service';
 
 @Injectable()
-export class UserService {
+export class UserService extends BaseService<User> {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
-    ) {}
+    ) {
+        super(userRepository);
+    }
 
     async findAll(pagination?: PaginationInput): Promise<IPaginatedType<User>> {
-        const {
-            page = 1,
-            limit = 10,
-            sortBy = 'createdAt',
-            sortDirection = 'DESC',
-        } = pagination || {};
-
-        const skip = (page - 1) * limit;
-
-        const [items, total] = await this.userRepository.findAndCount({
-            skip,
-            take: limit,
-            order: { [sortBy]: sortDirection },
-        });
-
-        const totalPages = Math.ceil(total / limit);
-
-        return {
-            items,
-            total,
-            page,
-            totalPages,
-            hasNext: page < totalPages,
-            hasPrevious: page > 1,
-        };
+        return this.paginate(pagination);
     }
 
     async findOne(id: string): Promise<User> {
