@@ -1,6 +1,6 @@
 import { Repository } from 'typeorm';
-import { PaginationInput } from '../../shared/types/graphql/inputs/pagination.input';
-import { IPaginatedType } from '../../shared/types/graphql/outputs/pagination.response';
+import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination.input';
+import { IPaginatedType } from '../../../shared/types/graphql/outputs/pagination.response';
 
 export abstract class BaseService<T> {
     constructor(protected readonly repository: Repository<T>) {}

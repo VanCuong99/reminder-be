@@ -30,49 +30,49 @@ Day counter & reminder application built with NestJS, GraphQL, TypeORM, and Post
 ### User Management
 
 - Authentication & Authorization
-  - User registration with validation
-  - JWT-based authentication
-  - Role-based access control (coming soon)
+    - User registration with validation
+    - JWT-based authentication
+    - Role-based access control (coming soon)
 - User Operations
-  - CRUD operations for users
-  - Advanced user search
-  - Paginated user queries with sorting
-  - Profile management
+    - CRUD operations for users
+    - Advanced user search
+    - Paginated user queries with sorting
+    - Profile management
 
 ### Data Management
 
 - Generic Pagination Support
-  - Configurable page size
-  - Dynamic sorting options
-  - Total count tracking
-  - Page information (prev/next)
+    - Configurable page size
+    - Dynamic sorting options
+    - Total count tracking
+    - Page information (prev/next)
 - Type-safe GraphQL Implementation
-  - Strong typing with TypeScript
-  - Input validation
-  - Error handling
-  - Response formatting
+    - Strong typing with TypeScript
+    - Input validation
+    - Error handling
+    - Response formatting
 
 ### Day Counter (In Progress)
 
 - Event Tracking
-  - Create and manage important dates
-  - Calculate days until/since events
-  - Recurring events support
+    - Create and manage important dates
+    - Calculate days until/since events
+    - Recurring events support
 - Customization
-  - Event categories
-  - Custom reminders
-  - Notification preferences
+    - Event categories
+    - Custom reminders
+    - Notification preferences
 
 ### Coming Soon
 
 - Reminder System
-  - Custom notification rules
-  - Multiple notification channels
-  - Scheduling system
+    - Custom notification rules
+    - Multiple notification channels
+    - Scheduling system
 - Social Features
-  - Friend connections
-  - Shared events
-  - Activity feed
+    - Friend connections
+    - Shared events
+    - Activity feed
 
 ## Project Structure
 
@@ -185,7 +185,7 @@ pnpm run test:cov
 
 # Run all checks (pre-commit)
 pnpm run pre-commit
-```
+````
 
 Branches should be named using the following format:
 
@@ -316,6 +316,34 @@ pnpm run test:e2e
 - Integration Tests: Key workflows
 - E2E Tests: Critical user journeys
 
+## Code Quality
+
+### SonarQube Analysis
+
+Để chạy phân tích code với SonarQube:
+
+1. Đảm bảo SonarQube server đang chạy (mặc định tại http://localhost:9000)
+
+2. Cài đặt SonarQube Scanner:
+
+```bash
+pnpm add -D sonarqube-scanner
+```
+
+3. Chạy test với coverage:
+
+```bash
+pnpm test:cov
+```
+
+4. Chạy SonarQube analysis:
+
+Khởi động Docker Desktop và chắc chắn rằng container của sonarqube hoạt động
+
+```bash
+docker run --rm --network=host -e SONAR_HOST_URL="http://localhost:9000" -e SONAR_TOKEN="YOUR_SONAR_TOKEN" -v "%cd%:/usr/src" sonarsource/sonar-scanner-cli
+```
+
 ## API Documentation
 
 ### GraphQL Playground
@@ -328,29 +356,31 @@ pnpm run test:e2e
 ```graphql
 # Get paginated users
 query {
-  users(pagination: { page: 1, limit: 10, sortBy: "createdAt", sortDirection: "DESC" }) {
-    items {
-      id
-      username
-      email
-      createdAt
+    users(pagination: { page: 1, limit: 10, sortBy: "createdAt", sortDirection: "DESC" }) {
+        items {
+            id
+            username
+            email
+            createdAt
+        }
+        total
+        page
+        totalPages
+        hasNext
+        hasPrevious
     }
-    total
-    page
-    totalPages
-    hasNext
-    hasPrevious
-  }
 }
 
 # Create new user
 mutation {
-  createUser(input: { username: "testuser", email: "test@example.com", password: "password123" }) {
-    id
-    username
-    email
-    createdAt
-  }
+    createUser(
+        input: { username: "testuser", email: "test@example.com", password: "password123" }
+    ) {
+        id
+        username
+        email
+        createdAt
+    }
 }
 ```
 
@@ -386,4 +416,3 @@ Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of
 ## License
 
 This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
-````

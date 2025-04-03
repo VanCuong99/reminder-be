@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../../domain/entities/user.entity';
-import { CreateUserInput } from '../../presentation/graphql/types/user/inputs/create-user.input';
-import { UpdateUserInput } from '../../presentation/graphql/types/user/inputs/update-user.input';
-import { PaginationInput } from '../../shared/types/graphql/inputs/pagination.input';
-import { IPaginatedType } from '../../shared/types/graphql/outputs/pagination.response';
+import { User } from '../../../domain/entities/user.entity';
+import { CreateUserInput } from '../../../presentation/graphql/types/user/inputs/create-user.input';
+import { UpdateUserInput } from '../../../presentation/graphql/types/user/inputs/update-user.input';
+import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination.input';
+import { IPaginatedType } from '../../../shared/types/graphql/outputs/pagination.response';
 import * as bcrypt from 'bcryptjs';
-import { BaseService } from './base.service';
+import { BaseService } from '../base/base.service';
 
 @Injectable()
 export class UserService extends BaseService<User> {
@@ -51,5 +51,9 @@ export class UserService extends BaseService<User> {
         Object.assign(user, updateUserInput);
 
         return this.userRepository.save(user);
+    }
+
+    async findOneByEmail(email: string): Promise<User> {
+        return this.userRepository.findOne({ where: { email } });
     }
 }

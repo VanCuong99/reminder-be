@@ -21,7 +21,8 @@
     "prepare": "husky install",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "pre-commit": "lint-staged"
+    "pre-commit": "lint-staged",
+    "sonar": "sonar-scanner"
   },
   "lint-staged": {
     "*.ts": [
@@ -38,14 +39,24 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.12",
     "@nestjs/graphql": "^13.0.4",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.12",
+    "@nestjs/throttler": "^6.4.0",
     "@nestjs/typeorm": "^11.0.0",
     "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "compression": "^1.8.0",
     "dotenv": "^16.4.7",
     "graphql": "^16.10.0",
+    "graphql-depth-limit": "^1.1.0",
     "graphql-tools": "^9.0.18",
+    "graphql-validation-complexity": "^0.4.2",
+    "helmet": "^8.1.0",
+    "joi": "^17.13.3",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
     "pg": "^8.14.1",
     "rxjs": "^7.8.2",
     "typeorm": "^0.3.21"
@@ -56,6 +67,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^29.5.12",
     "@types/node": "^22.13.14",
+    "@types/passport-jwt": "^4.0.1",
     "@typescript-eslint/eslint-plugin": "^7.3.1",
     "@typescript-eslint/parser": "^7.3.1",
     "eslint": "^8.57.0",
