@@ -8,6 +8,7 @@ import { UpdateUserInput } from '../../../presentation/graphql/types/user/inputs
 import { NotFoundException } from '@nestjs/common';
 import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination.input';
 import * as bcrypt from 'bcryptjs';
+import { UserRole } from '../../../shared/constants/user-role.enum';
 
 jest.mock('bcryptjs');
 
@@ -155,6 +156,7 @@ describe('UserService', () => {
                 username: 'newuser',
                 email: 'newuser@example.com',
                 password: 'password123',
+                role: UserRole.USER,
             };
 
             const hashedPassword = 'hashedPassword123';
@@ -180,6 +182,7 @@ describe('UserService', () => {
                 username: 'newuser',
                 email: 'newuser@example.com',
                 password: 'password123',
+                role: UserRole.USER,
             };
 
             (bcrypt.hash as jest.Mock).mockRejectedValue(new Error('Hashing failed'));

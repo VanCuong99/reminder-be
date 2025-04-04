@@ -203,6 +203,7 @@ describe('UserResolver', () => {
                 username: 'newuser',
                 email: 'newuser@example.com',
                 password: 'password123',
+                role: UserRole.USER,
             };
 
             const createdUser = {
@@ -225,6 +226,7 @@ describe('UserResolver', () => {
                 username: '', // invalid username
                 email: 'invalid-email', // invalid email
                 password: '123', // invalid password
+                role: UserRole.USER,
             };
 
             mockUserService.create.mockRejectedValue(new Error('Validation failed'));
@@ -238,6 +240,7 @@ describe('UserResolver', () => {
                 username: 'newuser',
                 email: 'newuser@example.com',
                 password: 'password123',
+                role: UserRole.USER,
             };
 
             mockUserService.create.mockRejectedValue(new Error('Database error'));
