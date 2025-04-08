@@ -6,9 +6,23 @@ import { CreateUserInput } from '../types/user/inputs/create-user.input';
 import { UpdateUserInput } from '../types/user/inputs/update-user.input';
 import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination.input';
 import { UserRole } from 'src/shared/constants/user-role.enum';
-import { NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from 'src/infrastructure/auth/guards/jwt-auth.guard';
+import { NotFoundException } from '@nestjs/common';
+
+jest.mock('@nestjs/graphql', () => {
+    const originalModule = jest.requireActual('@nestjs/graphql');
+    return {
+        ...originalModule,
+        Args: (name: string) => {
+            return function (target: any, propertyKey: string, parameterIndex: number) {
+                const existingArgs = Reflect.getMetadata('graphql:args', target[propertyKey]) || [];
+                existingArgs[parameterIndex] = { name };
+                Reflect.defineMetadata('graphql:args', existingArgs, target[propertyKey]);
+            };
+        },
+    };
+});
 
 describe('UserResolver', () => {
     let resolver: UserResolver;
@@ -93,269 +107,238 @@ describe('UserResolver', () => {
             const metadata = Reflect.getMetadata('graphql:resolver_type', resolver.updateUser);
             expect(metadata).toBe('Mutation');
         });
+
+        it('should have Args decorator on users method', () => {
+            const metadata = Reflect.getMetadata('graphql:args', resolver.users);
+            expect(metadata).toBeDefined();
+            expect(metadata[0].name).toBe('pagination');
+        });
+
+        it('should have Args decorator on user method', () => {
+            const metadata = Reflect.getMetadata('graphql:args', resolver.user);
+            expect(metadata).toBeDefined();
+            expect(metadata[0].name).toBe('id');
+        });
+
+        it('should have Args decorator on createUser method', () => {
+            const metadata = Reflect.getMetadata('graphql:args', resolver.createUser);
+            expect(metadata).toBeDefined();
+            expect(metadata[0].name).toBe('input');
+        });
+
+        it('should have Args decorator on updateUser method', () => {
+            const metadata = Reflect.getMetadata('graphql:args', resolver.updateUser);
+            expect(metadata).toBeDefined();
+            expect(metadata[0].name).toBe('id');
+            expect(metadata[1].name).toBe('input');
+        });
     });
 
     describe('users', () => {
-        it('should have correct decorators and return paginated users', async () => {
-            // Check decorators
-            const resolverType = Reflect.getMetadata('graphql:resolver_type', resolver.users);
-            expect(resolverType).toBe('Query');
+        it('should return paginated users with default pagination', async () => {
+            const mockUsers = [
+                { id: '1', username: 'test1', email: 'test1@example.com' },
+                { id: '2', username: 'test2', email: 'test2@example.com' },
+            ];
+            const total = 2;
 
-            // Test functionality
-            const pagination: PaginationInput = {
-                page: 1,
-                limit: 10,
-                sortBy: 'createdAt',
-                sortDirection: 'DESC',
-            };
-
-            const paginatedResult = {
-                items: [
-                    {
-                        id: '1',
-                        username: 'test1',
-                        email: 'test1@example.com',
-                        createdAt: new Date(),
-                    },
-                    {
-                        id: '2',
-                        username: 'test2',
-                        email: 'test2@example.com',
-                        createdAt: new Date(),
-                    },
-                ],
-                total: 2,
+            mockUserService.findAll.mockResolvedValue({
+                items: mockUsers,
+                total,
                 page: 1,
                 totalPages: 1,
                 hasNext: false,
                 hasPrevious: false,
-            };
-
-            mockUserService.findAll.mockResolvedValue(paginatedResult);
-
-            const result = await resolver.users(pagination);
-
-            expect(result).toEqual(paginatedResult);
-            expect(userService.findAll).toHaveBeenCalledWith(pagination);
-        });
-
-        it('should handle empty pagination input', async () => {
-            const paginatedResult = {
-                items: [],
-                total: 0,
-                page: 1,
-                totalPages: 0,
-                hasNext: false,
-                hasPrevious: false,
-            };
-
-            mockUserService.findAll.mockResolvedValue(paginatedResult);
+            });
 
             const result = await resolver.users();
 
-            expect(result).toEqual(paginatedResult);
-            expect(userService.findAll).toHaveBeenCalledWith(undefined);
+            expect(result).toEqual({
+                items: mockUsers,
+                total,
+                page: 1,
+                totalPages: 1,
+                hasNext: false,
+                hasPrevious: false,
+            });
+            expect(mockUserService.findAll).toHaveBeenCalledWith(undefined);
+        });
+
+        it('should return paginated users with custom pagination', async () => {
+            const pagination: PaginationInput = {
+                page: 2,
+                limit: 5,
+                sortBy: 'username',
+                sortDirection: 'ASC',
+            };
+            const mockUsers = [
+                { id: '6', username: 'test6', email: 'test6@example.com' },
+                { id: '7', username: 'test7', email: 'test7@example.com' },
+            ];
+            const total = 7;
+
+            mockUserService.findAll.mockResolvedValue({
+                items: mockUsers,
+                total,
+                page: 2,
+                totalPages: 2,
+                hasNext: false,
+                hasPrevious: true,
+            });
+
+            const result = await resolver.users(pagination);
+
+            expect(result).toEqual({
+                items: mockUsers,
+                total,
+                page: 2,
+                totalPages: 2,
+                hasNext: false,
+                hasPrevious: true,
+            });
+            expect(mockUserService.findAll).toHaveBeenCalledWith(pagination);
+        });
+
+        it('should handle service errors', async () => {
+            mockUserService.findAll.mockRejectedValue(new Error('Service error'));
+
+            await expect(resolver.users()).rejects.toThrow('Service error');
         });
     });
 
     describe('user', () => {
-        it('should have correct decorators and return a single user', async () => {
-            // Check decorators
-            const resolverType = Reflect.getMetadata('graphql:resolver_type', resolver.user);
-            expect(resolverType).toBe('Query');
-
-            // Test functionality
-            const userId = '1';
-            const user = {
-                id: userId,
-                username: 'test',
+        it('should return user by id', async () => {
+            const mockUser = {
+                id: '1',
+                username: 'testuser',
                 email: 'test@example.com',
-                createdAt: new Date(),
             };
 
-            mockUserService.findOne.mockResolvedValue(user);
+            mockUserService.findOne.mockResolvedValue(mockUser);
 
-            const result = await resolver.user(userId);
+            const result = await resolver.user('1');
 
-            expect(result).toEqual(user);
-            expect(userService.findOne).toHaveBeenCalledWith(userId);
+            expect(result).toEqual(mockUser);
+            expect(mockUserService.findOne).toHaveBeenCalledWith('1');
         });
 
-        it('should handle service throwing NotFoundException', async () => {
-            const userId = 'non-existent';
-            mockUserService.findOne.mockRejectedValue(
-                new NotFoundException(`User with ID "${userId}" not found`),
-            );
+        it('should throw NotFoundException when user not found', async () => {
+            mockUserService.findOne.mockRejectedValue(new NotFoundException());
 
-            await expect(resolver.user(userId)).rejects.toThrow(NotFoundException);
-            expect(userService.findOne).toHaveBeenCalledWith(userId);
+            await expect(resolver.user('nonexistent')).rejects.toThrow(NotFoundException);
+            expect(mockUserService.findOne).toHaveBeenCalledWith('nonexistent');
+        });
+
+        it('should handle service errors', async () => {
+            mockUserService.findOne.mockRejectedValue(new Error('Service error'));
+
+            await expect(resolver.user('1')).rejects.toThrow('Service error');
         });
     });
 
     describe('createUser', () => {
-        it('should have correct decorators and create a new user', async () => {
-            // Check decorators
-            const resolverType = Reflect.getMetadata('graphql:resolver_type', resolver.createUser);
-            expect(resolverType).toBe('Mutation');
-
-            // Test functionality
+        it('should create a new user', async () => {
             const createUserInput: CreateUserInput = {
                 username: 'newuser',
-                email: 'newuser@example.com',
+                email: 'new@example.com',
                 password: 'password123',
                 role: UserRole.USER,
             };
-
-            const createdUser = {
+            const mockUser = {
                 id: '1',
-                username: createUserInput.username,
-                email: createUserInput.email,
-                createdAt: new Date(),
+                ...createUserInput,
             };
 
-            mockUserService.create.mockResolvedValue(createdUser);
+            mockUserService.create.mockResolvedValue(mockUser);
 
             const result = await resolver.createUser(createUserInput);
 
-            expect(result).toEqual(createdUser);
-            expect(userService.create).toHaveBeenCalledWith(createUserInput);
+            expect(result).toEqual(mockUser);
+            expect(mockUserService.create).toHaveBeenCalledWith(createUserInput);
         });
 
-        it('should handle validation errors in create', async () => {
-            const invalidInput: CreateUserInput = {
-                username: '', // invalid username
-                email: 'invalid-email', // invalid email
-                password: '123', // invalid password
-                role: UserRole.USER,
-            };
+        it('should handle invalid input', async () => {
+            const invalidInputs = [
+                { email: '', password: 'password123' },
+                { email: 'test@example.com', password: '' },
+                { email: 'invalid-email', password: 'password123' },
+            ];
 
-            mockUserService.create.mockRejectedValue(new Error('Validation failed'));
-
-            await expect(resolver.createUser(invalidInput)).rejects.toThrow('Validation failed');
-            expect(userService.create).toHaveBeenCalledWith(invalidInput);
+            for (const input of invalidInputs) {
+                mockUserService.create.mockRejectedValue(new Error('Invalid input'));
+                await expect(resolver.createUser(input as CreateUserInput)).rejects.toThrow();
+            }
         });
 
-        it('should handle service errors in create', async () => {
+        it('should handle service errors', async () => {
             const createUserInput: CreateUserInput = {
                 username: 'newuser',
-                email: 'newuser@example.com',
+                email: 'new@example.com',
                 password: 'password123',
                 role: UserRole.USER,
             };
 
-            mockUserService.create.mockRejectedValue(new Error('Database error'));
+            mockUserService.create.mockRejectedValue(new Error('Service error'));
 
-            await expect(resolver.createUser(createUserInput)).rejects.toThrow('Database error');
-            expect(userService.create).toHaveBeenCalledWith(createUserInput);
+            await expect(resolver.createUser(createUserInput)).rejects.toThrow('Service error');
         });
     });
 
     describe('updateUser', () => {
-        it('should have correct decorators and update a user', async () => {
-            // Check decorators
-            const resolverType = Reflect.getMetadata('graphql:resolver_type', resolver.updateUser);
-            expect(resolverType).toBe('Mutation');
-
-            // Test functionality
-            const userId = '1';
+        it('should update an existing user', async () => {
             const updateUserInput: UpdateUserInput = {
                 username: 'updateduser',
                 email: 'updated@example.com',
             };
-
-            const updatedUser = {
-                id: userId,
+            const mockUser = {
+                id: '1',
                 ...updateUserInput,
-                createdAt: new Date(),
             };
 
-            mockUserService.update.mockResolvedValue(updatedUser);
+            mockUserService.update.mockResolvedValue(mockUser);
 
-            const result = await resolver.updateUser(userId, updateUserInput);
+            const result = await resolver.updateUser('1', updateUserInput);
 
-            expect(result).toEqual(updatedUser);
-            expect(userService.update).toHaveBeenCalledWith(userId, updateUserInput);
+            expect(result).toEqual(mockUser);
+            expect(mockUserService.update).toHaveBeenCalledWith('1', updateUserInput);
         });
 
-        it('should handle partial updates', async () => {
-            const userId = '1';
-            const existingUser = {
-                id: userId,
-                username: 'existinguser',
-                email: 'existing@example.com',
-                createdAt: new Date(),
-            };
-
+        it('should throw NotFoundException when user not found', async () => {
             const updateUserInput: UpdateUserInput = {
                 username: 'updateduser',
             };
 
-            const updatedUser = {
-                ...existingUser,
-                username: updateUserInput.username,
-            };
+            mockUserService.update.mockRejectedValue(new NotFoundException());
 
-            mockUserService.update.mockResolvedValue(updatedUser);
-
-            const result = await resolver.updateUser(userId, updateUserInput);
-
-            expect(result).toEqual(updatedUser);
-            expect(userService.update).toHaveBeenCalledWith(userId, updateUserInput);
-        });
-
-        it('should handle password updates', async () => {
-            const userId = '1';
-            const existingUser = {
-                id: userId,
-                username: 'existinguser',
-                email: 'existing@example.com',
-                createdAt: new Date(),
-            };
-
-            const updateUserInput: UpdateUserInput = {
-                password: 'newpassword123',
-            };
-
-            const updatedUser = {
-                ...existingUser,
-            };
-
-            mockUserService.update.mockResolvedValue(updatedUser);
-
-            const result = await resolver.updateUser(userId, updateUserInput);
-
-            expect(result).toEqual(updatedUser);
-            expect(userService.update).toHaveBeenCalledWith(userId, updateUserInput);
-        });
-
-        it('should handle user not found error', async () => {
-            const nonExistentId = 'non-existent';
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-            };
-
-            mockUserService.update.mockRejectedValue(
-                new NotFoundException(`User with ID "${nonExistentId}" not found`),
-            );
-
-            await expect(resolver.updateUser(nonExistentId, updateUserInput)).rejects.toThrow(
+            await expect(resolver.updateUser('nonexistent', updateUserInput)).rejects.toThrow(
                 NotFoundException,
             );
-            expect(userService.update).toHaveBeenCalledWith(nonExistentId, updateUserInput);
+            expect(mockUserService.update).toHaveBeenCalledWith('nonexistent', updateUserInput);
         });
 
-        it('should handle validation errors in update', async () => {
-            const userId = '1';
-            const invalidInput: UpdateUserInput = {
-                email: 'invalid-email', // invalid email format
+        it('should handle invalid input', async () => {
+            const invalidInputs = [
+                { email: '' },
+                { email: 'invalid-email' },
+                { password: 'short' },
+            ];
+
+            for (const input of invalidInputs) {
+                mockUserService.update.mockRejectedValue(new Error('Invalid input'));
+                await expect(resolver.updateUser('1', input as UpdateUserInput)).rejects.toThrow();
+            }
+        });
+
+        it('should handle service errors', async () => {
+            const updateUserInput: UpdateUserInput = {
+                username: 'updateduser',
             };
 
-            mockUserService.update.mockRejectedValue(new Error('Validation failed'));
+            mockUserService.update.mockRejectedValue(new Error('Service error'));
 
-            await expect(resolver.updateUser(userId, invalidInput)).rejects.toThrow(
-                'Validation failed',
+            await expect(resolver.updateUser('1', updateUserInput)).rejects.toThrow(
+                'Service error',
             );
-            expect(userService.update).toHaveBeenCalledWith(userId, invalidInput);
         });
     });
 

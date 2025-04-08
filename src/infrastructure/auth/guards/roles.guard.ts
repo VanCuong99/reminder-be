@@ -9,15 +9,30 @@ export class RolesGuard implements CanActivate {
     constructor(private readonly reflector: Reflector) {}
 
     canActivate(context: ExecutionContext): boolean {
-        const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>('roles', [
-            context.getHandler(),
-            context.getClass(),
-        ]);
-        if (!requiredRoles) {
-            return true;
+        try {
+            const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>('roles', [
+                context.getHandler(),
+                context.getClass(),
+            ]);
+
+            if (!requiredRoles) {
+                return true;
+            }
+
+            if (context.getType<string>() !== 'graphql') {
+                return false;
+            }
+
+            const ctx = GqlExecutionContext.create(context);
+            const user = ctx.getContext().req?.user;
+
+            if (!user?.role) {
+                return false;
+            }
+
+            return requiredRoles.includes(user.role);
+        } catch (error) {
+            return false;
         }
-        const ctx = GqlExecutionContext.create(context);
-        const user = ctx.getContext().req.user;
-        return requiredRoles.includes(user.role);
     }
 }
