@@ -1,13 +1,13 @@
-import { ObjectType, Field } from '@nestjs/graphql';
+import { Field, ObjectType } from '@nestjs/graphql';
 
 @ObjectType()
 export class BaseResponse {
-    @Field()
+    @Field(() => Boolean)
     success: boolean;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     message?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     error?: string;
 }

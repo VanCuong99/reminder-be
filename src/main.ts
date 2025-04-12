@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 
-async function bootstrap() {
+export async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     // Enable CORS
@@ -14,6 +14,7 @@ async function bootstrap() {
     await app.listen(3001);
     console.log(`Application is running on: ${await app.getUrl()}`);
     console.log(`GraphQL Playground is available at: ${await app.getUrl()}/graphql`);
+    return app;
 }
 
 bootstrap();
