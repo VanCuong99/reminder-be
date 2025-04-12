@@ -1,5 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsEmail, IsOptional, IsString, Length } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsStrongPassword, Length } from 'class-validator';
 
 @InputType()
 export class UpdateUserInput {
@@ -17,6 +17,15 @@ export class UpdateUserInput {
     @Field(() => String, { nullable: true })
     @IsOptional()
     @IsString()
-    @Length(6, 100)
+    @IsStrongPassword(
+        {
+            minLength: 6,
+            minLowercase: 1,
+            minUppercase: 1,
+            minNumbers: 1,
+            minSymbols: 1,
+        },
+        { message: 'Password is not strong enough' },
+    )
     password?: string;
 }

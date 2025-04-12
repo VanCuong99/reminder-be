@@ -1,12 +1,11 @@
+// create-database.ts
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { config } from 'dotenv';
 
 config();
 
-const configService = new ConfigService();
-
-async function createDatabase() {
+export async function createDatabase(configService: ConfigService = new ConfigService()) {
     const defaultDb = configService.get('DEFAULT_DB');
     if (!defaultDb) {
         console.error('DEFAULT_DB environment variable is not set');
@@ -27,20 +26,15 @@ async function createDatabase() {
         const queryRunner = defaultDataSource.createQueryRunner();
         const databaseName = configService.get('DB_NAME');
 
-        // Kiểm tra database có tồn tại không (không phân biệt chữ hoa/thường)
         const databases = await queryRunner.query(
             `SELECT datname FROM pg_database WHERE LOWER(datname) = LOWER('${databaseName}')`,
         );
 
         if (databases.length === 0) {
-            // Tạo database mới với tên chính xác
             await queryRunner.query(`CREATE DATABASE "${databaseName}"`);
             console.log(`Database ${databaseName} created successfully`);
-
-            // Đợi một chút để đảm bảo database được tạo hoàn toàn
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Kiểm tra kết nối đến database mới
             const newDataSource = new DataSource({
                 type: 'postgres',
                 host: configService.get('DB_HOST'),
@@ -54,7 +48,6 @@ async function createDatabase() {
             await newDataSource.destroy();
             console.log(`Database ${databaseName} is ready for use`);
         } else {
-            // Kiểm tra kết nối đến database hiện có
             const existingDataSource = new DataSource({
                 type: 'postgres',
                 host: configService.get('DB_HOST'),
@@ -81,5 +74,3 @@ async function createDatabase() {
         process.exit(1);
     }
 }
-
-createDatabase();

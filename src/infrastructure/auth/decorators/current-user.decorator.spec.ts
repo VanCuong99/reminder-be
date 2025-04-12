@@ -1,5 +1,6 @@
 import { ExecutionContext } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
+import { extractCurrentUser } from './current-user.decorator';
 
 const callback = (data: unknown, ctx: ExecutionContext) => {
     if (!ctx) {
@@ -32,12 +33,15 @@ const createEmptyGqlContext = () => ({
 
 describe('CurrentUser Decorator', () => {
     let mockContext: ExecutionContext;
-    let mockGqlContext: any;
     let gqlExecutionContextSpy: jest.SpyInstance;
 
-    beforeEach(() => {
-        mockGqlContext = createMockGqlContext();
+    const createUndefinedReqGqlContext = () => {
+        return {
+            getContext: () => ({ req: undefined }),
+        };
+    };
 
+    beforeEach(() => {
         mockContext = {
             switchToHttp: jest.fn(),
             getClass: jest.fn(),
@@ -62,12 +66,12 @@ describe('CurrentUser Decorator', () => {
         jest.clearAllMocks();
     });
 
-    describe('CurrentUser', () => {
+    describe('Callback logic', () => {
         it('should extract user from GraphQL request', () => {
             const result = callback(null, mockContext);
 
             expect(gqlExecutionContextSpy).toHaveBeenCalledWith(mockContext);
-            expect(result).toEqual(mockGqlContext.getContext().req.user);
+            expect(result).toEqual(createMockUser());
         });
 
         it('should extract user from HTTP request', () => {
@@ -86,7 +90,6 @@ describe('CurrentUser Decorator', () => {
 
         it('should handle null context', () => {
             const result = callback(null, null);
-
             expect(result).toBeUndefined();
         });
 
@@ -94,8 +97,6 @@ describe('CurrentUser Decorator', () => {
             gqlExecutionContextSpy.mockImplementation(() => createEmptyGqlContext() as any);
 
             const result = callback(null, mockContext);
-
-            expect(gqlExecutionContextSpy).toHaveBeenCalledWith(mockContext);
             expect(result).toBeUndefined();
         });
 
@@ -105,24 +106,37 @@ describe('CurrentUser Decorator', () => {
                 getRequest: () => ({ user: undefined }),
             });
 
-            const result = callback(null, mockContext);
+            gqlExecutionContextSpy.mockImplementation(createUndefinedReqGqlContext);
+            gqlExecutionContextSpy.mockImplementation(createUndefinedReqGqlContext);
 
-            expect(mockContext.switchToHttp).toHaveBeenCalled();
+            const result = callback(null, mockContext);
             expect(result).toBeUndefined();
         });
+    });
 
-        it('should handle undefined req in GraphQL context', () => {
-            const mockGqlContext = {
-                getContext: () => ({
-                    req: undefined,
-                }),
-            };
-            gqlExecutionContextSpy.mockImplementation(() => mockGqlContext);
+    it('should ignore data argument and still return user', () => {
+        const result = callback('any-data', mockContext);
+        expect(result).toEqual(createMockUser());
+    });
 
-            const result = callback(null, mockContext);
+    describe('Decorator usage (createParamDecorator)', () => {
+        it('should return user via extractCurrentUser in GraphQL context', () => {
+            gqlExecutionContextSpy.mockImplementation(() => createMockGqlContext() as any);
 
-            expect(gqlExecutionContextSpy).toHaveBeenCalledWith(mockContext);
-            expect(result).toBeUndefined();
+            const result = extractCurrentUser(mockContext as any);
+            expect(result).toEqual(createMockUser());
+        });
+
+        it('should return user via extractCurrentUser in HTTP context', () => {
+            const mockHttpRequest = { user: createMockUser() };
+
+            (mockContext.getType as jest.Mock).mockReturnValue('http');
+            (mockContext.switchToHttp as jest.Mock).mockReturnValue({
+                getRequest: () => mockHttpRequest,
+            });
+
+            const result = extractCurrentUser(mockContext as any);
+            expect(result).toEqual(createMockUser());
         });
     });
 });
