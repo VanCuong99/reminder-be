@@ -10,6 +10,10 @@ jobs:
     build:
         runs-on: ubuntu-latest
 
+        env:
+            JWT_SECRET: ${{ secrets.JWT_SECRET }}
+            ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+
         steps:
             - uses: actions/checkout@v3
               with:
@@ -34,22 +38,3 @@ jobs:
 
             - name: Run tests
               run: pnpm run test:cov
-
-            # - name: SonarQube Scan
-            #   uses: SonarSource/sonarqube-scan-action@master
-            #   env:
-            #       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-            #       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-            #   with:
-            #       args: >
-            #           -Dsonar.projectKey=momento-be
-            #           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            #           -Dsonar.sources=src
-            #           -Dsonar.tests=src
-            #           -Dsonar.test.inclusions=**/*.spec.ts
-            #           -Dsonar.coverage.exclusions=**/*.spec.ts,src/main.ts,src/app.module.ts
-            #           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            #           -Dsonar.coverage.exclusions=**/*.spec.ts,src/main.ts,src/app.module.ts
-            #           -Dsonar.qualitygate.wait=true
-            #           -Dsonar.qualitygate.conditions=coverage:80,duplicated_lines:3,duplicated_blocks:2
-            #           -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info

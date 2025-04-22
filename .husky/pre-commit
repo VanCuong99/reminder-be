@@ -1,15 +1,25 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+#!/bin/bash
 
 # Lấy tên của branch hiện tại
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
 # Kiểm tra xem branch có phải là 'master', 'main', hoặc 'develop' không
 if [[ "$current_branch" == "master" || "$current_branch" == "main" || "$current_branch" == "develop" ]]; then
-  echo "Không thể push code khi đang ở trên các branch master, main hoặc develop!"
+  echo "Không thể commit trên các branch master, main hoặc develop!"
   exit 1
 fi
 
-# Nếu không ở trên các branch trên, tiếp tục với các bước tiếp theo
+# Chạy test với coverage và lấy kết quả
+coverage=$(pnpm run test:cov)
+
+# Trích xuất phần trăm coverage từ kết quả
+coverage_percentage=$(echo "$coverage" | grep -oP 'Total\s+\d+\s+\|\s+(\d+)\s+%' | sed 's/[^0-9]*//g')
+
+# Kiểm tra nếu coverage < 80
+if [ "$coverage_percentage" -lt 80 ]; then
+  echo "Coverage quá thấp: $coverage_percentage%. Cần ít nhất 80% để tiếp tục."
+  exit 1
+fi
+
+# Nếu không có lỗi, tiếp tục commit
 pnpm run pre-commit
-pnpm run test
