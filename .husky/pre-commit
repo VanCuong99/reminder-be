@@ -1,5 +1,15 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# Lấy tên của branch hiện tại
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+# Kiểm tra xem branch có phải là 'master', 'main', hoặc 'develop' không
+if [[ "$current_branch" == "master" || "$current_branch" == "main" || "$current_branch" == "develop" ]]; then
+  echo "Không thể push code khi đang ở trên các branch master, main hoặc develop!"
+  exit 1
+fi
+
+# Nếu không ở trên các branch trên, tiếp tục với các bước tiếp theo
 pnpm run pre-commit
-pnpm run test 
+pnpm run test

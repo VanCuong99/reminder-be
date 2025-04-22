@@ -16,7 +16,7 @@ jest.mock('@nestjs/graphql', () => {
         ...originalModule,
         Args: (name: string) => {
             return function (target: any, propertyKey: string, parameterIndex: number) {
-                const existingArgs = Reflect.getMetadata('graphql:args', target[propertyKey]) || [];
+                const existingArgs = Reflect.getMetadata('graphql:args', target[propertyKey]) ?? [];
                 existingArgs[parameterIndex] = { name };
                 Reflect.defineMetadata('graphql:args', existingArgs, target[propertyKey]);
             };

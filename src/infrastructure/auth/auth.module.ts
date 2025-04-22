@@ -21,6 +21,7 @@ import { AuthService } from 'src/application/services/auth/auth.service';
             }),
             inject: [ConfigService],
         }),
+        ConfigModule,
     ],
     providers: [AuthService, JwtStrategy, AuthResolver],
     exports: [AuthService],
