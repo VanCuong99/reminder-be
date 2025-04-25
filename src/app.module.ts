@@ -19,12 +19,28 @@ import { join } from 'path';
         ConfigModule.forRoot({
             isGlobal: true,
             validationSchema: Joi.object({
+                NODE_ENV: Joi.string()
+                    .valid('development', 'production', 'test', 'provision')
+                    .default('development'),
                 JWT_SECRET: Joi.string().required(),
                 JWT_EXPIRATION: Joi.string().default('1h'),
                 ALLOWED_ORIGINS: Joi.string().required(),
-                FIREBASE_PROJECT_ID: Joi.string().required(),
-                FIREBASE_CLIENT_EMAIL: Joi.string().required(),
-                FIREBASE_PRIVATE_KEY: Joi.string().required(),
+                // Chỉ yêu cầu các biến Firebase trong môi trường production
+                FIREBASE_PROJECT_ID: Joi.string().when('NODE_ENV', {
+                    is: 'production',
+                    then: Joi.required(),
+                    otherwise: Joi.optional().default('mock-project-id'),
+                }),
+                FIREBASE_CLIENT_EMAIL: Joi.string().when('NODE_ENV', {
+                    is: 'production',
+                    then: Joi.required(),
+                    otherwise: Joi.optional().default('mock-client-email@example.com'),
+                }),
+                FIREBASE_PRIVATE_KEY: Joi.string().when('NODE_ENV', {
+                    is: 'production',
+                    then: Joi.required(),
+                    otherwise: Joi.optional().default('mock-private-key'),
+                }),
                 // ... other env validations
             }),
         }),
