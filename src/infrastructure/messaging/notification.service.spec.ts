@@ -77,16 +77,56 @@ describe('NotificationService', () => {
     });
 
     it('should initialize Firebase app successfully', async () => {
+        // Giả lập môi trường không phải test để kích hoạt khởi tạo Firebase thật
+        jest.spyOn(configService, 'get').mockImplementation(key => {
+            if (key === 'NODE_ENV') {
+                return 'development';
+            }
+            if (key === 'FIREBASE_PRIVATE_KEY') {
+                return 'mock-private-key';
+            }
+            return null;
+        });
+
+        const oldEnv = process.env.NODE_ENV;
+        const oldJestWorker = process.env.JEST_WORKER_ID;
+        delete process.env.JEST_WORKER_ID;
+        process.env.NODE_ENV = 'development';
+
         const mockInitializeApp = require('firebase-admin').initializeApp;
         await notificationService.onModuleInit();
+
+        // Khôi phục môi trường
+        process.env.NODE_ENV = oldEnv;
+        if (oldJestWorker) {
+            process.env.JEST_WORKER_ID = oldJestWorker;
+        }
+
         expect(mockInitializeApp).toHaveBeenCalled();
     });
 
     it('should throw an error if private key is not configured', async () => {
-        jest.spyOn(configService, 'get').mockReturnValue(null);
+        jest.spyOn(configService, 'get').mockImplementation(key => {
+            if (key === 'NODE_ENV') {
+                return 'development';
+            }
+            return null; // Trả về null cho tất cả các trường khác, bao gồm FIREBASE_PRIVATE_KEY
+        });
+
+        const oldEnv = process.env.NODE_ENV;
+        const oldJestWorker = process.env.JEST_WORKER_ID;
+        delete process.env.JEST_WORKER_ID;
+        process.env.NODE_ENV = 'development';
+
         await expect(notificationService.onModuleInit()).rejects.toThrow(
             'Firebase private key is not configured',
         );
+
+        // Khôi phục môi trường
+        process.env.NODE_ENV = oldEnv;
+        if (oldJestWorker) {
+            process.env.JEST_WORKER_ID = oldJestWorker;
+        }
     });
 
     describe('validateTokenFormat', () => {
@@ -129,6 +169,14 @@ describe('NotificationService', () => {
         });
 
         it('should handle firebase errors', async () => {
+            // Temporarily spy on logger.error to prevent test failure due to expected error logging
+            jest.spyOn(notificationService['logger'], 'error').mockImplementation(() => {});
+
+            // Make sure we don't fallback to mock implementation for this test
+            jest.spyOn(notificationService as any, 'mockSendMessage').mockImplementation(() => {
+                throw new Error('Firebase error');
+            });
+
             // Mô phỏng lỗi từ firebase khi gọi send
             require('firebase-admin').messaging.send.mockRejectedValueOnce(
                 new Error('Firebase error'),

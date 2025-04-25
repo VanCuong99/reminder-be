@@ -101,8 +101,25 @@ describe('DeviceTokenService', () => {
             });
         });
 
-        it.skip('should validate production token format', async () => {
+        it('should validate production token format', async () => {
             jest.spyOn(configService, 'get').mockReturnValue('production');
+            // Mock repository.findOne to return null so a new token is created
+            jest.spyOn(repository, 'findOne').mockResolvedValue(null);
+            // Mock repository.create to return a new token object
+            jest.spyOn(repository, 'create').mockReturnValue({
+                user: mockUser,
+                token: mockProductionToken,
+                deviceType: 'ios',
+                userId: mockUser.id,
+            } as DeviceToken);
+            // Mock repository.save to return the saved token
+            jest.spyOn(repository, 'save').mockResolvedValue({
+                user: mockUser,
+                token: mockProductionToken,
+                deviceType: 'ios',
+                userId: mockUser.id,
+                isActive: true,
+            } as DeviceToken);
 
             await expect(
                 service.saveToken(mockUser as any, 'invalid_token', 'ios'),

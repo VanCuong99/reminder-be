@@ -262,6 +262,41 @@ describe('UserService', () => {
                 },
             );
         });
+
+        it('should handle broadcast notification error', async () => {
+            const createUserInput: CreateUserInput = {
+                username: 'newuser',
+                email: 'newuser@example.com',
+                password: 'password123',
+                role: UserRole.USER,
+            };
+
+            const hashedPassword = 'hashedPassword123';
+            (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
+
+            const createdUser = { id: '1', ...createUserInput, password: hashedPassword };
+            mockRepository.create.mockReturnValue(createdUser);
+            mockRepository.save.mockResolvedValue(createdUser);
+
+            // Mock successful user notification but failed broadcast
+            mockNotificationService.sendNotificationToUser.mockResolvedValue(true);
+            mockNotificationService.broadcastNotification.mockRejectedValue(
+                new Error('Broadcast failed'),
+            );
+
+            await expect(service.create(createUserInput)).rejects.toThrow('Broadcast failed');
+            expect(bcrypt.hash).toHaveBeenCalledWith(createUserInput.password, 10);
+            expect(repository.create).toHaveBeenCalledWith({
+                ...createUserInput,
+                password: hashedPassword,
+            });
+            expect(repository.save).toHaveBeenCalledWith(createdUser);
+            expect(notificationService.sendNotificationToUser).toHaveBeenCalled();
+            expect(notificationService.broadcastNotification).toHaveBeenCalledWith({
+                title: 'New User Joined',
+                body: 'A new user has joined the platform!',
+            });
+        });
     });
 
     describe('update', () => {
