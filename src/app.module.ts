@@ -7,6 +7,8 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { UserModule } from './presentation/user.module';
 import { AuthModule } from './infrastructure/auth/auth.module';
+import { NotificationModule } from './infrastructure/messaging/notification.module';
+import { DeviceTokenModule } from './application/services/device-token/device-token.module';
 import * as depthLimit from 'graphql-depth-limit';
 import { createComplexityLimitRule } from 'graphql-validation-complexity';
 import * as Joi from 'joi';
@@ -20,6 +22,9 @@ import { join } from 'path';
                 JWT_SECRET: Joi.string().required(),
                 JWT_EXPIRATION: Joi.string().default('1h'),
                 ALLOWED_ORIGINS: Joi.string().required(),
+                FIREBASE_PROJECT_ID: Joi.string().required(),
+                FIREBASE_CLIENT_EMAIL: Joi.string().required(),
+                FIREBASE_PRIVATE_KEY: Joi.string().required(),
                 // ... other env validations
             }),
         }),
@@ -53,6 +58,8 @@ import { join } from 'path';
         DatabaseModule,
         UserModule,
         AuthModule,
+        NotificationModule,
+        DeviceTokenModule,
     ],
 })
 export class AppModule {}

@@ -22,6 +22,7 @@ describe('AuthService', () => {
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
+        deviceTokens: [],
     };
 
     beforeEach(async () => {

@@ -15,9 +15,12 @@ module.exports = {
     modulePaths: ['<rootDir>'],
     coveragePathIgnorePatterns: [
         'node_modules',
-        'src/infrastructure/database/migrations',
+        'dist',
+        'src/infrastructure/database',
         'src/shared/types/graphql/outputs',
         'src/shared/types/graphql/inputs',
         'src/presentation/graphql/types',
+        'src/domain/entities',
+        'src/domain/interfaces',
     ],
 };

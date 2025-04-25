@@ -43,6 +43,7 @@ describe('JwtStrategy', () => {
         password: 'hashedpassword',
         createdAt: new Date(),
         updatedAt: new Date(),
+        deviceTokens: [],
     };
 
     beforeEach(async () => {
@@ -111,7 +112,11 @@ describe('JwtStrategy', () => {
                 role: UserRole.USER,
             };
 
-            const inactiveUser = { ...mockUser, isActive: false };
+            const inactiveUser = {
+                ...mockUser,
+                isActive: false,
+                deviceTokens: [],
+            };
             jest.spyOn(userService, 'findOne').mockResolvedValue(inactiveUser);
 
             await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);

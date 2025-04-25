@@ -3,7 +3,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthResolver } from './auth.resolver';
 import { AuthService } from 'src/application/services/auth/auth.service';
 import { LoginInput } from '../types/auth/inputs/login.input';
-import { AuthResponse } from '../types/auth/outputs/auth.response';
 import { UserRole } from 'src/shared/constants/user-role.enum';
 import { UnauthorizedException } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
@@ -31,6 +30,21 @@ jest.mock('@nestjs/graphql', () => {
 describe('AuthResolver', () => {
     let resolver: AuthResolver;
     let authService: AuthService;
+
+    const mockUser = {
+        id: '1',
+        email: 'test@example.com',
+        username: 'testuser',
+        role: UserRole.USER,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isActive: true,
+    };
+
+    const mockAuthResponse = {
+        access_token: 'mock-token',
+        user: mockUser,
+    };
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
@@ -69,19 +83,8 @@ describe('AuthResolver', () => {
                 email: 'test@example.com',
                 password: 'password123',
             };
-            const expectedResponse: AuthResponse = {
-                access_token: 'mock-token',
-                user: {
-                    id: '1',
-                    email: 'test@example.com',
-                    username: 'testuser',
-                    role: UserRole.USER,
-                    createdAt: new Date(),
-                    isActive: true,
-                },
-            };
 
-            (authService.login as jest.Mock).mockResolvedValue(expectedResponse);
+            (authService.login as jest.Mock).mockResolvedValue(mockAuthResponse);
 
             const result = await resolver.login(loginInput);
 
@@ -89,7 +92,7 @@ describe('AuthResolver', () => {
             expect(metadata).toBe('Mutation');
 
             expect(authService.login).toHaveBeenCalledWith(loginInput);
-            expect(result).toEqual(expectedResponse);
+            expect(result).toEqual(mockAuthResponse);
         });
 
         it('should have Args decorator on login method', () => {
@@ -105,24 +108,13 @@ describe('AuthResolver', () => {
                 email: 'test@example.com',
                 password: 'password123',
             };
-            const expectedResponse: AuthResponse = {
-                access_token: 'mock-token',
-                user: {
-                    id: '1',
-                    email: 'test@example.com',
-                    username: 'testuser',
-                    role: UserRole.USER,
-                    createdAt: new Date(),
-                    isActive: true,
-                },
-            };
 
-            (authService.login as jest.Mock).mockResolvedValue(expectedResponse);
+            (authService.login as jest.Mock).mockResolvedValue(mockAuthResponse);
 
             const result = await resolver.login(loginInput);
 
             expect(authService.login).toHaveBeenCalledWith(loginInput);
-            expect(result).toEqual(expectedResponse);
+            expect(result).toEqual(mockAuthResponse);
         });
 
         it('should throw UnauthorizedException when authService.login throws', async () => {

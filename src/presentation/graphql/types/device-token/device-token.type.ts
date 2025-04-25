@@ -1,20 +1,22 @@
-// src/presentation/graphql/types/user/outputs/user.type.ts
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { UserRole } from '../../../../../shared/constants/user-role.enum';
+import { UserType } from '../user/outputs/user.type';
 
 @ObjectType()
-export class UserType {
+export class DeviceToken {
     @Field(() => ID)
     id: string;
 
     @Field()
-    username: string;
+    token: string;
 
     @Field()
-    email: string;
+    deviceType: string;
 
-    @Field(() => UserRole)
-    role: UserRole;
+    @Field(() => UserType)
+    user: UserType;
+
+    @Field()
+    userId: string;
 
     @Field()
     createdAt: Date;

@@ -23,7 +23,7 @@ export abstract class BaseService<T> {
         const skip = (page - 1) * limit;
 
         // Merge default order with custom order if provided
-        const order = options.order || { [sortBy]: sortDirection };
+        const order = options.order ?? { [sortBy]: sortDirection };
 
         const [items, total] = await this.repository.findAndCount({
             skip,
