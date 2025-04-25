@@ -9,7 +9,7 @@ const configService = new ConfigService();
 const dataSource = new DataSource({
     type: 'postgres',
     host: configService.get('DB_HOST'),
-    port: configService.get('DB_PORT'),
+    port: parseInt(configService.get('DB_PORT') ?? '5432', 10),
     username: configService.get('DB_USERNAME'),
     password: configService.get('DB_PASSWORD'),
     database: configService.get('DB_NAME'),
@@ -19,4 +19,4 @@ const dataSource = new DataSource({
     logging: true,
 });
 
-export default dataSource; 
+export default dataSource;

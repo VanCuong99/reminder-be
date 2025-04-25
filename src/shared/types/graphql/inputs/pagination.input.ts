@@ -18,4 +18,4 @@ export class PaginationInput {
     @Field({ nullable: true })
     @IsOptional()
     sortDirection?: 'ASC' | 'DESC';
-} 
+}

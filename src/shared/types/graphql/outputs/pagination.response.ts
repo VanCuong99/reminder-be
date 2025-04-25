@@ -33,4 +33,4 @@ export function Paginated<T>(ItemType: Type<T>): Type<IPaginatedType<T>> {
     }
 
     return PaginatedResponseClass as Type<IPaginatedType<T>>;
-} 
+}

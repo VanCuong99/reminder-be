@@ -1,4 +1,6 @@
+// src/presentation/graphql/types/user/outputs/user.type.ts
 import { ObjectType, Field } from '@nestjs/graphql';
+import { UserRole } from '../../../../../shared/constants/user-role.enum';
 
 @ObjectType()
 export class UserType {
@@ -11,9 +13,12 @@ export class UserType {
     @Field()
     email: string;
 
-    @Field()
-    password: string;
+    @Field(() => UserRole)
+    role: UserRole;
 
     @Field()
     createdAt: Date;
-} 
+
+    @Field()
+    isActive: boolean;
+}
