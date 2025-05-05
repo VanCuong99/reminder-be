@@ -1,12 +1,14 @@
 // src/domain/entities/user.entity.ts
-import { UserRole } from 'src/shared/constants/user-role.enum';
 import {
     Entity,
     Column,
     PrimaryGeneratedColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    OneToMany,
 } from 'typeorm';
+import { DeviceToken } from './device-token.entity';
+import { UserRole } from '../../shared/constants/user-role.enum';
 
 @Entity()
 export class User {
@@ -37,4 +39,7 @@ export class User {
 
     @Column({ default: true })
     isActive: boolean;
+
+    @OneToMany(() => DeviceToken, deviceToken => deviceToken.user)
+    deviceTokens: DeviceToken[];
 }

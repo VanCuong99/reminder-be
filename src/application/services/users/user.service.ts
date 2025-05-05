@@ -8,12 +8,14 @@ import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination
 import { IPaginatedType } from '../../../shared/types/graphql/outputs/pagination.response';
 import * as bcrypt from 'bcryptjs';
 import { BaseService } from '../base/base.service';
+import { NotificationService } from '../../../infrastructure/messaging/notification.service';
 
 @Injectable()
 export class UserService extends BaseService<User> {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
+        private readonly notificationService: NotificationService,
     ) {
         super(userRepository);
     }
@@ -36,7 +38,28 @@ export class UserService extends BaseService<User> {
             ...createUserInput,
             password: hashedPassword,
         });
-        return this.userRepository.save(user);
+        const savedUser = await this.userRepository.save(user);
+
+        // Send welcome notification to the user
+        await this.notificationService.sendNotificationToUser(
+            savedUser.id,
+            {
+                title: 'Welcome!',
+                body: 'Welcome to our platform!',
+            },
+            {
+                userId: savedUser.id,
+                type: 'welcome',
+            },
+        );
+
+        // Send broadcast notification about new user
+        await this.notificationService.broadcastNotification({
+            title: 'New User Joined',
+            body: 'A new user has joined the platform!',
+        });
+
+        return savedUser;
     }
 
     async update(id: string, updateUserInput: UpdateUserInput): Promise<User> {

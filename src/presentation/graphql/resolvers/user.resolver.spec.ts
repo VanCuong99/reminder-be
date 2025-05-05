@@ -351,6 +351,7 @@ describe('UserResolver', () => {
                 username: 'testuser',
                 role: UserRole.USER,
                 createdAt: new Date(),
+                updatedAt: new Date(),
                 isActive: true,
             };
 

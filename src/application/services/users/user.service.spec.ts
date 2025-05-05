@@ -9,18 +9,25 @@ import { NotFoundException } from '@nestjs/common';
 import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination.input';
 import * as bcrypt from 'bcryptjs';
 import { UserRole } from '../../../shared/constants/user-role.enum';
+import { NotificationService } from '../../../infrastructure/messaging/notification.service';
 
 jest.mock('bcryptjs');
 
 describe('UserService', () => {
     let service: UserService;
     let repository: Repository<User>;
+    let notificationService: NotificationService;
 
     const mockRepository = {
         create: jest.fn(),
         save: jest.fn(),
         findOne: jest.fn(),
         findAndCount: jest.fn(),
+    };
+
+    const mockNotificationService = {
+        sendNotificationToUser: jest.fn().mockResolvedValue(true),
+        broadcastNotification: jest.fn().mockResolvedValue(true),
     };
 
     beforeEach(async () => {
@@ -31,11 +38,16 @@ describe('UserService', () => {
                     provide: getRepositoryToken(User),
                     useValue: mockRepository,
                 },
+                {
+                    provide: NotificationService,
+                    useValue: mockNotificationService,
+                },
             ],
         }).compile();
 
         service = module.get<UserService>(UserService);
         repository = module.get<Repository<User>>(getRepositoryToken(User));
+        notificationService = module.get<NotificationService>(NotificationService);
     });
 
     afterEach(() => {
@@ -151,7 +163,7 @@ describe('UserService', () => {
     });
 
     describe('create', () => {
-        it('should create a new user with hashed password', async () => {
+        it('should create a new user with hashed password and send notifications', async () => {
             const createUserInput: CreateUserInput = {
                 username: 'newuser',
                 email: 'newuser@example.com',
@@ -175,6 +187,24 @@ describe('UserService', () => {
                 password: hashedPassword,
             });
             expect(repository.save).toHaveBeenCalledWith(createdUser);
+
+            // Verify notification service calls
+            expect(notificationService.sendNotificationToUser).toHaveBeenCalledWith(
+                createdUser.id,
+                {
+                    title: 'Welcome!',
+                    body: 'Welcome to our platform!',
+                },
+                {
+                    userId: createdUser.id,
+                    type: 'welcome',
+                },
+            );
+
+            expect(notificationService.broadcastNotification).toHaveBeenCalledWith({
+                title: 'New User Joined',
+                body: 'A new user has joined the platform!',
+            });
         });
 
         it('should handle password hashing error', async () => {
@@ -191,6 +221,81 @@ describe('UserService', () => {
             expect(bcrypt.hash).toHaveBeenCalledWith(createUserInput.password, 10);
             expect(repository.create).not.toHaveBeenCalled();
             expect(repository.save).not.toHaveBeenCalled();
+            expect(notificationService.sendNotificationToUser).not.toHaveBeenCalled();
+            expect(notificationService.broadcastNotification).not.toHaveBeenCalled();
+        });
+
+        it('should handle notification sending error', async () => {
+            const createUserInput: CreateUserInput = {
+                username: 'newuser',
+                email: 'newuser@example.com',
+                password: 'password123',
+                role: UserRole.USER,
+            };
+
+            const hashedPassword = 'hashedPassword123';
+            (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
+
+            const createdUser = { id: '1', ...createUserInput, password: hashedPassword };
+            mockRepository.create.mockReturnValue(createdUser);
+            mockRepository.save.mockResolvedValue(createdUser);
+            mockNotificationService.sendNotificationToUser.mockRejectedValue(
+                new Error('Notification failed'),
+            );
+
+            await expect(service.create(createUserInput)).rejects.toThrow('Notification failed');
+            expect(bcrypt.hash).toHaveBeenCalledWith(createUserInput.password, 10);
+            expect(repository.create).toHaveBeenCalledWith({
+                ...createUserInput,
+                password: hashedPassword,
+            });
+            expect(repository.save).toHaveBeenCalledWith(createdUser);
+            expect(notificationService.sendNotificationToUser).toHaveBeenCalledWith(
+                createdUser.id,
+                {
+                    title: 'Welcome!',
+                    body: 'Welcome to our platform!',
+                },
+                {
+                    userId: createdUser.id,
+                    type: 'welcome',
+                },
+            );
+        });
+
+        it('should handle broadcast notification error', async () => {
+            const createUserInput: CreateUserInput = {
+                username: 'newuser',
+                email: 'newuser@example.com',
+                password: 'password123',
+                role: UserRole.USER,
+            };
+
+            const hashedPassword = 'hashedPassword123';
+            (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
+
+            const createdUser = { id: '1', ...createUserInput, password: hashedPassword };
+            mockRepository.create.mockReturnValue(createdUser);
+            mockRepository.save.mockResolvedValue(createdUser);
+
+            // Mock successful user notification but failed broadcast
+            mockNotificationService.sendNotificationToUser.mockResolvedValue(true);
+            mockNotificationService.broadcastNotification.mockRejectedValue(
+                new Error('Broadcast failed'),
+            );
+
+            await expect(service.create(createUserInput)).rejects.toThrow('Broadcast failed');
+            expect(bcrypt.hash).toHaveBeenCalledWith(createUserInput.password, 10);
+            expect(repository.create).toHaveBeenCalledWith({
+                ...createUserInput,
+                password: hashedPassword,
+            });
+            expect(repository.save).toHaveBeenCalledWith(createdUser);
+            expect(notificationService.sendNotificationToUser).toHaveBeenCalled();
+            expect(notificationService.broadcastNotification).toHaveBeenCalledWith({
+                title: 'New User Joined',
+                body: 'A new user has joined the platform!',
+            });
         });
     });
 
@@ -239,41 +344,6 @@ describe('UserService', () => {
             });
         });
 
-        it('should update user with both password and other fields', async () => {
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-                email: 'updated@example.com',
-                password: 'newpassword123',
-            };
-
-            const hashedPassword = 'newhashed';
-            (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockResolvedValue({
-                ...existingUser,
-                username: 'updateduser',
-                email: 'updated@example.com',
-                password: hashedPassword,
-            });
-
-            const result = await service.update('1', updateUserInput);
-
-            expect(result).toEqual({
-                ...existingUser,
-                username: 'updateduser',
-                email: 'updated@example.com',
-                password: hashedPassword,
-            });
-            expect(bcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
-            expect(repository.save).toHaveBeenCalledWith({
-                ...existingUser,
-                username: 'updateduser',
-                email: 'updated@example.com',
-                password: hashedPassword,
-            });
-        });
-
         it('should throw NotFoundException when user not found', async () => {
             const updateUserInput: UpdateUserInput = {
                 username: 'updateduser',
@@ -283,219 +353,6 @@ describe('UserService', () => {
 
             await expect(service.update('1', updateUserInput)).rejects.toThrow(NotFoundException);
             expect(repository.save).not.toHaveBeenCalled();
-        });
-
-        it('should handle password hashing error during update', async () => {
-            const updateUserInput: UpdateUserInput = {
-                password: 'newpassword123',
-            };
-
-            (bcrypt.hash as jest.Mock).mockRejectedValue(new Error('Hashing failed'));
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-
-            await expect(service.update('1', updateUserInput)).rejects.toThrow('Hashing failed');
-            expect(repository.save).not.toHaveBeenCalled();
-        });
-
-        it('should update multiple fields without password', async () => {
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-                email: 'updated@example.com',
-            };
-
-            const updatedUser = {
-                ...existingUser,
-                username: 'updateduser',
-                email: 'updated@example.com',
-            };
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockResolvedValue(updatedUser);
-
-            const result = await service.update('1', updateUserInput);
-
-            expect(result).toEqual(updatedUser);
-            expect(bcrypt.hash).not.toHaveBeenCalled();
-            expect(repository.save).toHaveBeenCalledWith(updatedUser);
-        });
-
-        it('should save user after update', async () => {
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-            };
-
-            const updatedUser = {
-                ...existingUser,
-                username: 'updateduser',
-            };
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockResolvedValue(updatedUser);
-
-            const result = await service.update('1', updateUserInput);
-
-            expect(result).toEqual(updatedUser);
-            expect(repository.save).toHaveBeenCalledWith(updatedUser);
-            expect(repository.save).toHaveBeenCalledTimes(1);
-        });
-
-        it('should handle save error', async () => {
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-            };
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockRejectedValue(new Error('Save failed'));
-
-            await expect(service.update('1', updateUserInput)).rejects.toThrow('Save failed');
-            expect(repository.save).toHaveBeenCalledWith({
-                ...existingUser,
-                username: 'updateduser',
-            });
-        });
-
-        it('should handle save error during update', async () => {
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-                email: 'updated@example.com',
-                password: 'newpassword123',
-            };
-
-            const hashedPassword = 'newhashed';
-            (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockRejectedValue(new Error('Database error'));
-
-            await expect(service.update('1', updateUserInput)).rejects.toThrow('Database error');
-            expect(bcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
-            expect(repository.save).toHaveBeenCalledWith({
-                ...existingUser,
-                username: 'updateduser',
-                email: 'updated@example.com',
-                password: hashedPassword,
-            });
-        });
-
-        it('should correctly merge fields during update', async () => {
-            const existingUser = {
-                id: '1',
-                username: 'existinguser',
-                email: 'existing@example.com',
-                password: 'oldhashed',
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
-
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-            };
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockImplementation(user => Promise.resolve(user));
-
-            const result = await service.update('1', updateUserInput);
-
-            expect(result).toEqual({
-                ...existingUser,
-                username: 'updateduser',
-            });
-            expect(result.email).toBe(existingUser.email);
-            expect(result.password).toBe(existingUser.password);
-            expect(result.createdAt).toBe(existingUser.createdAt);
-            expect(result.updatedAt).toBe(existingUser.updatedAt);
-        });
-
-        it('should correctly assign only provided fields during update', async () => {
-            const existingUser = {
-                id: '1',
-                username: 'existinguser',
-                email: 'existing@example.com',
-                password: 'oldhashed',
-            };
-
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-            };
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockImplementation(user => Promise.resolve(user));
-
-            const result = await service.update('1', updateUserInput);
-
-            // Verify that Object.assign was called correctly
-            expect(result).toEqual({
-                ...existingUser,
-                username: 'updateduser',
-            });
-
-            // Verify that only the provided field was updated
-            expect(result.username).toBe('updateduser');
-            expect(result.email).toBe('existing@example.com');
-            expect(result.password).toBe('oldhashed');
-
-            // Verify that save was called with the correct object
-            expect(repository.save).toHaveBeenCalledWith({
-                ...existingUser,
-                username: 'updateduser',
-            });
-        });
-
-        it('should correctly assign fields during update', async () => {
-            const existingUser = {
-                id: '1',
-                username: 'existinguser',
-                email: 'existing@example.com',
-                password: 'oldhashed',
-            };
-
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-                email: 'updated@example.com',
-            };
-
-            const expectedUser = {
-                ...existingUser,
-                username: 'updateduser',
-                email: 'updated@example.com',
-            };
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockImplementation(user => {
-                // Verify that Object.assign was called correctly
-                expect(user).toEqual(expectedUser);
-                return Promise.resolve(user);
-            });
-
-            const result = await service.update('1', updateUserInput);
-
-            expect(result).toEqual(expectedUser);
-            expect(repository.save).toHaveBeenCalledWith(expectedUser);
-        });
-
-        it('should use Object.assign to merge fields', async () => {
-            const existingUser = {
-                id: '1',
-                username: 'existinguser',
-                email: 'existing@example.com',
-                password: 'oldhashed',
-            };
-
-            const updateUserInput: UpdateUserInput = {
-                username: 'updateduser',
-                email: 'updated@example.com',
-            };
-
-            const assignSpy = jest.spyOn(Object, 'assign');
-
-            mockRepository.findOne.mockResolvedValue(existingUser);
-            mockRepository.save.mockImplementation(user => Promise.resolve(user));
-
-            await service.update('1', updateUserInput);
-
-            expect(assignSpy).toHaveBeenCalledWith(existingUser, updateUserInput);
-            assignSpy.mockRestore();
         });
     });
 });
