@@ -1,14 +1,14 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { GqlExecutionContext } from '@nestjs/graphql';
 import { RolesGuard } from './roles.guard';
 import { UserRole } from 'src/shared/constants/user-role.enum';
+import { ROLES_KEY } from '../decorators/role.decorator';
 
 describe('RolesGuard', () => {
     let guard: RolesGuard;
     let reflector: jest.Mocked<Reflector>;
     let mockContext: jest.Mocked<ExecutionContext>;
-    let mockGqlContext: any;
+    let mockHttpContext: any;
 
     beforeEach(() => {
         reflector = {
@@ -20,7 +20,7 @@ describe('RolesGuard', () => {
         mockContext = {
             getHandler: jest.fn(),
             getClass: jest.fn(),
-            getType: jest.fn(() => 'graphql'),
+            getType: jest.fn(() => 'http'),
             getArgs: jest.fn(),
             getArgByIndex: jest.fn(),
             switchToHttp: jest.fn(),
@@ -28,17 +28,15 @@ describe('RolesGuard', () => {
             switchToWs: jest.fn(),
         } as unknown as jest.Mocked<ExecutionContext>;
 
-        mockGqlContext = {
-            getContext: jest.fn().mockReturnValue({
-                req: {
-                    user: {
-                        role: UserRole.USER,
-                    },
+        mockHttpContext = {
+            getRequest: jest.fn().mockReturnValue({
+                user: {
+                    role: UserRole.USER,
                 },
             }),
         };
 
-        jest.spyOn(GqlExecutionContext, 'create').mockReturnValue(mockGqlContext);
+        mockContext.switchToHttp.mockReturnValue(mockHttpContext);
     });
 
     afterEach(() => {
@@ -51,28 +49,41 @@ describe('RolesGuard', () => {
         const result = guard.canActivate(mockContext);
 
         expect(result).toBe(true);
-        expect(reflector.getAllAndOverride).toHaveBeenCalledWith('roles', [
+        expect(reflector.getAllAndOverride).toHaveBeenCalledWith(ROLES_KEY, [
             mockContext.getHandler(),
             mockContext.getClass(),
         ]);
     });
 
-    it('should deny access for non-GraphQL contexts', () => {
-        mockContext.getType.mockReturnValue('http');
+    it('should deny access for non-HTTP contexts (switchToHttp missing)', () => {
+        // Simulate context.switchToHttp is not a function
+        (mockContext as any).switchToHttp = undefined;
         reflector.getAllAndOverride.mockReturnValue([UserRole.USER]);
-
         const result = guard.canActivate(mockContext);
-
         expect(result).toBe(false);
+    });
+
+    it('should deny access if getRequest is not a function', () => {
+        reflector.getAllAndOverride.mockReturnValue([UserRole.USER]);
+        mockContext.switchToHttp.mockReturnValue({
+            getRequest: undefined,
+            getResponse: () => ({}) as any,
+            getNext: () => ({}) as any,
+        });
+        const result = guard.canActivate(mockContext);
+        expect(result).toBe(false);
+    });
+    it('should allow access when ROLES_KEY is not defined', () => {
+        reflector.getAllAndOverride.mockReturnValue(undefined);
+        const result = guard.canActivate(mockContext);
+        expect(result).toBe(true);
     });
 
     it('should allow access when user has required role', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.USER]);
-        mockGqlContext.getContext.mockReturnValue({
-            req: {
-                user: {
-                    role: UserRole.USER,
-                },
+        mockHttpContext.getRequest.mockReturnValue({
+            user: {
+                role: UserRole.USER,
             },
         });
 
@@ -83,11 +94,9 @@ describe('RolesGuard', () => {
 
     it('should deny access when user lacks required role', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
-        mockGqlContext.getContext.mockReturnValue({
-            req: {
-                user: {
-                    role: UserRole.USER,
-                },
+        mockHttpContext.getRequest.mockReturnValue({
+            user: {
+                role: UserRole.USER,
             },
         });
 
@@ -98,9 +107,7 @@ describe('RolesGuard', () => {
 
     it('should deny access when user is not present', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.USER]);
-        mockGqlContext.getContext.mockReturnValue({
-            req: {},
-        });
+        mockHttpContext.getRequest.mockReturnValue({});
 
         const result = guard.canActivate(mockContext);
 
@@ -109,7 +116,11 @@ describe('RolesGuard', () => {
 
     it('should deny access when request is not present', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.USER]);
-        mockGqlContext.getContext.mockReturnValue({});
+        mockContext.switchToHttp.mockReturnValue({
+            getRequest: () => null,
+            getResponse: () => ({}) as any,
+            getNext: () => ({}) as any,
+        });
 
         const result = guard.canActivate(mockContext);
 
@@ -118,7 +129,7 @@ describe('RolesGuard', () => {
 
     it('should deny access when context is invalid', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.USER]);
-        mockGqlContext.getContext.mockReturnValue(null);
+        mockContext.switchToHttp.mockReturnValue(null);
 
         const result = guard.canActivate(mockContext);
 
@@ -129,31 +140,25 @@ describe('RolesGuard', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.USER, UserRole.ADMIN]);
 
         // Test with USER role
-        mockGqlContext.getContext.mockReturnValue({
-            req: {
-                user: {
-                    role: UserRole.USER,
-                },
+        mockHttpContext.getRequest.mockReturnValue({
+            user: {
+                role: UserRole.USER,
             },
         });
         expect(guard.canActivate(mockContext)).toBe(true);
 
         // Test with ADMIN role
-        mockGqlContext.getContext.mockReturnValue({
-            req: {
-                user: {
-                    role: UserRole.ADMIN,
-                },
+        mockHttpContext.getRequest.mockReturnValue({
+            user: {
+                role: UserRole.ADMIN,
             },
         });
         expect(guard.canActivate(mockContext)).toBe(true);
 
         // Test with non-matching role
-        mockGqlContext.getContext.mockReturnValue({
-            req: {
-                user: {
-                    role: 'OTHER',
-                },
+        mockHttpContext.getRequest.mockReturnValue({
+            user: {
+                role: 'OTHER',
             },
         });
         expect(guard.canActivate(mockContext)).toBe(false);
@@ -171,11 +176,9 @@ describe('RolesGuard', () => {
 
     it('should handle invalid role values', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.USER]);
-        mockGqlContext.getContext.mockReturnValue({
-            req: {
-                user: {
-                    role: 'INVALID_ROLE',
-                },
+        mockHttpContext.getRequest.mockReturnValue({
+            user: {
+                role: 'INVALID_ROLE',
             },
         });
 

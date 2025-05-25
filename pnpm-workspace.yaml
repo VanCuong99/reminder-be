@@ -1,3 +1,9 @@
 packages:
-  - "src/**"
-  - "!**/test/**"
+  - src/**
+  - '!**/test/**'
+onlyBuiltDependencies:
+  - '@firebase/util'
+  - '@nestjs/core'
+  - '@scarf/scarf'
+  - bcrypt
+  - protobufjs

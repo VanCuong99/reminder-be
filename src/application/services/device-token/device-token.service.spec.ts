@@ -4,9 +4,26 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DeviceTokenService } from './device-token.service';
 import { DeviceToken } from '../../../domain/entities/device-token.entity';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 
 describe('DeviceTokenService', () => {
+    // Silence all logger output for all tests
+    let loggerErrorSpy: jest.SpyInstance;
+    let loggerDebugSpy: jest.SpyInstance;
+    let loggerWarnSpy: jest.SpyInstance;
+    let loggerLogSpy: jest.SpyInstance;
+    beforeAll(() => {
+        loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+        loggerDebugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+        loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+        loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    });
+    afterAll(() => {
+        loggerErrorSpy.mockRestore();
+        loggerDebugSpy.mockRestore();
+        loggerWarnSpy.mockRestore();
+        loggerLogSpy.mockRestore();
+    });
     let service: DeviceTokenService;
     let repository: Repository<DeviceToken>;
     let configService: ConfigService;
@@ -47,6 +64,24 @@ describe('DeviceTokenService', () => {
         service = module.get<DeviceTokenService>(DeviceTokenService);
         repository = module.get<Repository<DeviceToken>>(getRepositoryToken(DeviceToken));
         configService = module.get<ConfigService>(ConfigService);
+    });
+
+    describe('validateFcmToken (private)', () => {
+        it('should accept token with length 140-200 in production mode', () => {
+            jest.spyOn(configService, 'get').mockReturnValue('production');
+            // @ts-ignore: access private method
+            const validToken = 'a'.repeat(140);
+            expect(service['validateFcmToken'](validToken)).toBe(true);
+            const validToken2 = 'a'.repeat(200);
+            expect(service['validateFcmToken'](validToken2)).toBe(true);
+        });
+
+        it('should reject token with length < 140 or > 200 in production mode', () => {
+            jest.spyOn(configService, 'get').mockReturnValue('production');
+            // @ts-ignore: access private method
+            expect(service['validateFcmToken']('a'.repeat(139))).toBe(false);
+            expect(service['validateFcmToken']('a'.repeat(201))).toBe(false);
+        });
     });
 
     it('should be defined', () => {
@@ -174,6 +209,33 @@ describe('DeviceTokenService', () => {
             expect(result).toEqual(mockTokens);
             expect(repository.find).toHaveBeenCalledWith({
                 where: { isActive: true },
+                relations: ['user'],
+            });
+        });
+    });
+
+    describe('getTokensForMultipleUsers', () => {
+        it('should return an empty array if no userIds are provided', async () => {
+            const result = await service.getTokensForMultipleUsers([]);
+            expect(result).toEqual([]);
+            expect(repository.find).not.toHaveBeenCalled();
+        });
+
+        it('should call repository.find with correct query for multiple userIds', async () => {
+            const userIds = ['1', '2', '3'];
+            const mockTokens = [
+                { token: 'token1', userId: '1', isActive: true },
+                { token: 'token2', userId: '2', isActive: true },
+            ];
+            jest.spyOn(repository, 'find').mockResolvedValue(mockTokens as DeviceToken[]);
+
+            const result = await service.getTokensForMultipleUsers(userIds);
+            expect(result).toEqual(mockTokens);
+            expect(repository.find).toHaveBeenCalledWith({
+                where: {
+                    userId: expect.any(Object), // In(userIds) is an object
+                    isActive: true,
+                },
                 relations: ['user'],
             });
         });

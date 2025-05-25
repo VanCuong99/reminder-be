@@ -3,28 +3,34 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Copy package files
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies
-RUN npm install
+RUN pnpm install
 
 # Copy source code
 COPY . .
 
 # Build application
-RUN npm run build
+RUN pnpm build
 
 # Production stage
 FROM node:20-alpine
 
 WORKDIR /app
 
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Copy package files
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install production dependencies only
-RUN npm install --production
+RUN pnpm install --prod
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
@@ -33,4 +39,4 @@ COPY --from=builder /app/dist ./dist
 EXPOSE 3001
 
 # Start application
-CMD ["npm", "run", "start:prod"] 
+CMD ["pnpm", "start:prod"] 

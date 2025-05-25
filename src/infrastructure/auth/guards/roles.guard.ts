@@ -1,8 +1,8 @@
 // src/infrastructure/auth/guards/roles.guard.ts
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { GqlExecutionContext } from '@nestjs/graphql';
-import { UserRole } from 'src/shared/constants/user-role.enum';
+import { UserRole } from '../../../shared/constants/user-role.enum';
+import { ROLES_KEY } from '../decorators/role.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -10,28 +10,27 @@ export class RolesGuard implements CanActivate {
 
     canActivate(context: ExecutionContext): boolean {
         try {
-            const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>('roles', [
+            const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
                 context.getHandler(),
                 context.getClass(),
             ]);
 
-            if (!requiredRoles) {
+            // If no roles are required, allow access
+            if (!requiredRoles || requiredRoles.length === 0) {
                 return true;
             }
 
-            if (context.getType<string>() !== 'graphql') {
+            const http = context.switchToHttp?.();
+            if (!http || typeof http.getRequest !== 'function') return false;
+
+            const request = http.getRequest();
+            if (!request || !request.user?.role) {
                 return false;
             }
 
-            const ctx = GqlExecutionContext.create(context);
-            const user = ctx.getContext().req?.user;
-
-            if (!user?.role) {
-                return false;
-            }
-
-            return requiredRoles.includes(user.role);
-        } catch (error) {
+            // Check if user has any of the required roles
+            return requiredRoles.includes(request.user.role);
+        } catch {
             return false;
         }
     }

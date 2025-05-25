@@ -42,3 +42,7 @@ docker-compose.override.yml
 
 # SonarQube
 .scannerwork/
+
+# key
+keys/
+*.pem

@@ -1,9 +1,19 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { join } from 'path';
+import * as path from 'path';
 
-// Đảm bảo load file .env
-config();
+// Ensure .env file is loaded with absolute path
+const envPath = path.resolve(process.cwd(), '.env');
+config({ path: envPath });
+
+console.log('Database config:', {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    username: process.env.DB_USERNAME,
+    database: process.env.DB_NAME,
+    // Not logging password for security reasons
+});
 
 const dataSource = new DataSource({
     type: 'postgres',

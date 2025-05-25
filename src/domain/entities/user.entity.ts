@@ -21,8 +21,14 @@ export class User {
     @Column({ unique: true })
     email: string;
 
-    @Column()
+    @Column({ nullable: true })
     password: string;
+
+    @Column({ nullable: true })
+    socialId?: string;
+
+    @Column({ nullable: true })
+    provider?: string;
 
     @Column({
         type: 'enum',
@@ -30,6 +36,16 @@ export class User {
         default: UserRole.USER,
     })
     role: UserRole;
+
+    @Column({ default: 'UTC' })
+    timezone: string;
+
+    @Column({ type: 'json', nullable: true })
+    notificationPrefs: {
+        email: boolean;
+        push: boolean;
+        frequency: 'daily' | 'weekly' | 'immediate';
+    };
 
     @CreateDateColumn()
     createdAt: Date;

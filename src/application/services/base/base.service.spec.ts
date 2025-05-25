@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
 import { BaseService } from './base.service';
-import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination.input';
+import { PaginationDto, SortDirection } from '../../../presentation/dto/common/pagination.dto';
+import { Logger } from '@nestjs/common';
 
 // Create a concrete implementation of BaseService for testing
 class TestEntity {
@@ -15,12 +16,29 @@ class TestService extends BaseService<TestEntity> {
     }
 
     // Expose protected method for testing
-    async testPaginate(pagination?: PaginationInput, options = {}) {
+    async testPaginate(pagination?: PaginationDto, options = {}) {
         return this.paginate(pagination, options);
     }
 }
 
 describe('BaseService', () => {
+    // Silence all logger output for all tests
+    let loggerErrorSpy: jest.SpyInstance;
+    let loggerDebugSpy: jest.SpyInstance;
+    let loggerWarnSpy: jest.SpyInstance;
+    let loggerLogSpy: jest.SpyInstance;
+    beforeAll(() => {
+        loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+        loggerDebugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+        loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+        loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    });
+    afterAll(() => {
+        loggerErrorSpy.mockRestore();
+        loggerDebugSpy.mockRestore();
+        loggerWarnSpy.mockRestore();
+        loggerLogSpy.mockRestore();
+    });
     let service: TestService;
     let repository: Repository<TestEntity>;
 
@@ -83,11 +101,11 @@ describe('BaseService', () => {
 
             jest.spyOn(repository, 'findAndCount').mockResolvedValue([items, total]);
 
-            const pagination: PaginationInput = {
+            const pagination: PaginationDto = {
                 page: 2,
                 limit: 10,
                 sortBy: 'id',
-                sortDirection: 'ASC',
+                sortDirection: SortDirection.ASC,
             };
 
             const result = await service.testPaginate(pagination);

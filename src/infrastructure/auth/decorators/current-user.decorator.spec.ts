@@ -1,142 +1,78 @@
-import { ExecutionContext } from '@nestjs/common';
-import { GqlExecutionContext } from '@nestjs/graphql';
+import { ExecutionContext, Logger } from '@nestjs/common';
 import { extractCurrentUser } from './current-user.decorator';
 
-const callback = (data: unknown, ctx: ExecutionContext) => {
-    if (!ctx) {
-        return undefined;
-    }
-    if (ctx.getType() === 'http') {
-        return ctx.switchToHttp().getRequest()?.user;
-    }
-    const gqlCtx = GqlExecutionContext.create(ctx).getContext();
-    return gqlCtx.req?.user;
-};
-
-const createMockUser = () => ({
-    id: '123',
-    email: 'test@example.com',
-    role: 'USER',
-});
-
-const createMockGqlContext = (user = createMockUser()) => ({
-    getContext: () => ({
-        req: { user },
-    }),
-});
-
-const createEmptyGqlContext = () => ({
-    getContext: () => ({
-        req: { user: undefined },
-    }),
-});
-
 describe('CurrentUser Decorator', () => {
-    let mockContext: ExecutionContext;
-    let gqlExecutionContextSpy: jest.SpyInstance;
+    // Silence all logger output for all tests
+    let loggerErrorSpy: jest.SpyInstance;
+    let loggerDebugSpy: jest.SpyInstance;
+    let loggerWarnSpy: jest.SpyInstance;
+    let loggerLogSpy: jest.SpyInstance;
+    beforeAll(() => {
+        loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+        loggerDebugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+        loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+        loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    });
+    afterAll(() => {
+        loggerErrorSpy.mockRestore();
+        loggerDebugSpy.mockRestore();
+        loggerWarnSpy.mockRestore();
+        loggerLogSpy.mockRestore();
+    });
 
-    const createUndefinedReqGqlContext = () => {
-        return {
-            getContext: () => ({ req: undefined }),
-        };
-    };
+    let mockExecutionContext: Partial<ExecutionContext>;
+    let mockRequest: any;
 
     beforeEach(() => {
-        mockContext = {
-            switchToHttp: jest.fn(),
-            getClass: jest.fn(),
+        mockRequest = {
+            user: { id: '1', email: 'test@example.com' },
+        };
+
+        mockExecutionContext = {
+            switchToHttp: jest.fn().mockReturnValue({
+                getRequest: jest.fn().mockReturnValue(mockRequest),
+            }),
+            getType: jest.fn().mockReturnValue('http'),
             getHandler: jest.fn(),
+            getClass: jest.fn(),
             getArgs: jest.fn(),
             getArgByIndex: jest.fn(),
             switchToRpc: jest.fn(),
             switchToWs: jest.fn(),
-            getType: jest.fn().mockReturnValue('graphql'),
-            getRequest: jest.fn(),
-            constructor: {
-                name: 'ExecutionContext',
-            },
-        } as any;
-
-        gqlExecutionContextSpy = jest
-            .spyOn(GqlExecutionContext, 'create')
-            .mockImplementation(() => createMockGqlContext() as any);
+        };
     });
 
-    afterEach(() => {
-        jest.clearAllMocks();
+    it('should extract user from HTTP context', () => {
+        const result = extractCurrentUser(mockExecutionContext as ExecutionContext);
+        expect(result).toEqual(mockRequest.user);
+        expect(mockExecutionContext.switchToHttp).toHaveBeenCalled();
     });
 
-    describe('Callback logic', () => {
-        it('should extract user from GraphQL request', () => {
-            const result = callback(null, mockContext);
-
-            expect(gqlExecutionContextSpy).toHaveBeenCalledWith(mockContext);
-            expect(result).toEqual(createMockUser());
-        });
-
-        it('should extract user from HTTP request', () => {
-            const mockHttpRequest = { user: createMockUser() };
-
-            (mockContext.getType as jest.Mock).mockReturnValue('http');
-            (mockContext.switchToHttp as jest.Mock).mockReturnValue({
-                getRequest: () => mockHttpRequest,
-            });
-
-            const result = callback(null, mockContext);
-
-            expect(mockContext.switchToHttp).toHaveBeenCalled();
-            expect(result).toEqual(mockHttpRequest.user);
-        });
-
-        it('should handle null context', () => {
-            const result = callback(null, null);
-            expect(result).toBeUndefined();
-        });
-
-        it('should handle undefined user in GraphQL context', () => {
-            gqlExecutionContextSpy.mockImplementation(() => createEmptyGqlContext() as any);
-
-            const result = callback(null, mockContext);
-            expect(result).toBeUndefined();
-        });
-
-        it('should handle undefined user in HTTP context', () => {
-            (mockContext.getType as jest.Mock).mockReturnValue('http');
-            (mockContext.switchToHttp as jest.Mock).mockReturnValue({
-                getRequest: () => ({ user: undefined }),
-            });
-
-            gqlExecutionContextSpy.mockImplementation(createUndefinedReqGqlContext);
-            gqlExecutionContextSpy.mockImplementation(createUndefinedReqGqlContext);
-
-            const result = callback(null, mockContext);
-            expect(result).toBeUndefined();
-        });
+    it('should return undefined for non-HTTP context types', () => {
+        (mockExecutionContext.getType as jest.Mock).mockReturnValue('rpc');
+        const result = extractCurrentUser(mockExecutionContext as ExecutionContext);
+        expect(result).toBeUndefined();
     });
 
-    it('should ignore data argument and still return user', () => {
-        const result = callback('any-data', mockContext);
-        expect(result).toEqual(createMockUser());
+    it('should handle missing request gracefully', () => {
+        (mockExecutionContext.switchToHttp as jest.Mock).mockReturnValue({
+            getRequest: jest.fn().mockReturnValue(undefined),
+        });
+        const result = extractCurrentUser(mockExecutionContext as ExecutionContext);
+        expect(result).toBeUndefined();
     });
 
-    describe('Decorator usage (createParamDecorator)', () => {
-        it('should return user via extractCurrentUser in GraphQL context', () => {
-            gqlExecutionContextSpy.mockImplementation(() => createMockGqlContext() as any);
+    it('should handle missing user gracefully', () => {
+        mockRequest.user = undefined;
+        const result = extractCurrentUser(mockExecutionContext as ExecutionContext);
+        expect(result).toBeUndefined();
+    });
 
-            const result = extractCurrentUser(mockContext as any);
-            expect(result).toEqual(createMockUser());
+    it('should handle implementation errors gracefully', () => {
+        (mockExecutionContext.switchToHttp as jest.Mock).mockImplementation(() => {
+            throw new Error('Unexpected error');
         });
-
-        it('should return user via extractCurrentUser in HTTP context', () => {
-            const mockHttpRequest = { user: createMockUser() };
-
-            (mockContext.getType as jest.Mock).mockReturnValue('http');
-            (mockContext.switchToHttp as jest.Mock).mockReturnValue({
-                getRequest: () => mockHttpRequest,
-            });
-
-            const result = extractCurrentUser(mockContext as any);
-            expect(result).toEqual(createMockUser());
-        });
+        const result = extractCurrentUser(mockExecutionContext as ExecutionContext);
+        expect(result).toBeUndefined();
     });
 });

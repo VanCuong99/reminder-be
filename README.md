@@ -1,6 +1,6 @@
 # Momento Backend
 
-Day counter & reminder application built with NestJS, GraphQL, TypeORM, and PostgreSQL.
+Day counter & reminder application built with NestJS, REST API, TypeORM, and PostgreSQL.
 
 ## Table of Contents
 
@@ -12,18 +12,19 @@ Day counter & reminder application built with NestJS, GraphQL, TypeORM, and Post
 - [API Documentation](#api-documentation)
 - [Testing](#testing)
 - [Deployment](#deployment)
+- [Recent Refactoring](#recent-refactoring)
 
 ## Technologies
 
 - **Core Framework**: NestJS v11
-- **API Layer**: GraphQL v16 with Apollo Server
+- **API Layer**: RESTful API with Swagger documentation
 - **Database**: PostgreSQL v15
 - **ORM**: TypeORM v0.3
 - **Container**: Docker & Docker Compose
 - **Language**: TypeScript v5
 - **Package Manager**: pnpm v8
 - **Testing**: Jest
-- **Documentation**: GraphQL Playground
+- **Documentation**: Swagger UI
 
 ## Features
 
@@ -32,7 +33,7 @@ Day counter & reminder application built with NestJS, GraphQL, TypeORM, and Post
 - Authentication & Authorization
     - User registration with validation
     - JWT-based authentication
-    - Role-based access control (coming soon)
+    - Role-based access control
 - User Operations
     - CRUD operations for users
     - Advanced user search
@@ -46,11 +47,11 @@ Day counter & reminder application built with NestJS, GraphQL, TypeORM, and Post
     - Dynamic sorting options
     - Total count tracking
     - Page information (prev/next)
-- Type-safe GraphQL Implementation
+- Type-safe REST Implementation
     - Strong typing with TypeScript
     - Input validation
     - Error handling
-    - Response formatting
+    - Standardized response formatting
 
 ### Day Counter (In Progress)
 
@@ -69,11 +70,9 @@ Day counter & reminder application built with NestJS, GraphQL, TypeORM, and Post
 
 src/
 ├── presentation/ # Interface adapters layer
-│ ├── controllers/ # REST controllers (if needed)
-│ ├── graphql/ # GraphQL components
-│ │ ├── resolvers/ # GraphQL resolvers
-│ │ ├── types/ # GraphQL types and inputs
-│ └── dto/ # Data Transfer Objects
+│ ├── controllers/ # REST controllers
+│ ├── dto/ # Data Transfer Objects
+│ └── interceptors/ # Request/response interceptors
 ├── application/ # Application business rules
 │ ├── services/ # Application services
 │ ├── interfaces/ # Port interfaces
@@ -100,21 +99,20 @@ src/
 
 ### Installation Steps
 
-```bash
+````bash
 # Install specific Node.js version
 nvm install 20.11.1
 
 # Install dependencies
 pnpm install
-```
 
-# Setup environment
+### Setup environment
 
-cp .env.example .env
+### Start development server
 
-# Start development server
-
-pnpm run start:dev
+```bash
+pnpm start:dev
+````
 
 ````
 ## Code Quality & CI/CD
@@ -176,7 +174,7 @@ pnpm run test:cov
 
 # Run all checks (pre-commit)
 pnpm run pre-commit
-```
+````
 
 Branches should be named using the following format:
 
@@ -298,10 +296,9 @@ src/
 │   │       └── jwt.strategy.spec.ts
 │   └── database/
 ├── presentation/
-│   └── graphql/
-│       └── resolvers/
-│           ├── auth.resolver.spec.ts
-│           └── user.resolver.spec.ts
+│   └── controllers/
+│       ├── auth.controller.spec.ts
+│       └── user.controller.spec.ts
 └── shared/
 ```
 
@@ -357,41 +354,24 @@ docker run --rm --network=host -e SONAR_HOST_URL="http://localhost:9000" -e SONA
 
 ## API Documentation
 
-### GraphQL Playground
+### Swagger UI
 
-- Development: http://localhost:3001/graphql
-- Docker: http://localhost:3002/graphql
+- Development: http://localhost:3001/api
+- Docker: http://localhost:3002/api
 
-### Sample Queries
+### Sample Endpoints
 
-```graphql
+```http
 # Get paginated users
-query {
-    users(pagination: { page: 1, limit: 10, sortBy: "createdAt", sortDirection: "DESC" }) {
-        items {
-            id
-            username
-            email
-            createdAt
-        }
-        total
-        page
-        totalPages
-        hasNext
-        hasPrevious
-    }
-}
+GET /users?page=1&limit=10&sortBy=createdAt&sortDirection=DESC
 
 # Create new user
-mutation {
-    createUser(
-        input: { username: "testuser", email: "test@example.com", password: "password123" }
-    ) {
-        id
-        username
-        email
-        createdAt
-    }
+POST /users
+Content-Type: application/json
+{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123"
 }
 ```
 
@@ -420,6 +400,44 @@ pnpm run build
 pnpm run start:prod
 ```
 
+## Recent Refactoring
+
+### Controller Best Practices Implementation
+
+As part of our ongoing code quality improvements, we've refactored several controllers to follow best practices by moving business logic out of controllers and into dedicated services.
+
+#### New Services Created:
+1. **DeviceDetectionService**
+   - Handles device type detection (Android, iOS, Web, Other)
+   - Replaces inline device detection logic in controllers
+
+2. **TokenValidationService** 
+   - Provides methods for validating Firebase tokens
+   - Extracts authorization tokens from requests
+   - Eliminates duplicated validation logic
+
+#### Controllers Refactored:
+
+1. **EventController & GuestEventController**
+   - Now use DeviceFingerprintingService for device ID generation
+   - Use DeviceDetectionService for device type detection
+   - Improved separation of concerns
+
+2. **GuestDeviceTokenController**
+   - Uses TokenValidationService for Firebase token validation
+   - Uses DeviceFingerprintingService for auto-generating device IDs
+   - Enhanced response handling for auto-generated device IDs
+
+3. **DeviceTokenController**
+   - Now uses TokenValidationService for token extraction and validation
+   - Improved code organization
+
+4. **GuestNotificationController**
+   - Ensures consistent use of DeviceFingerprintingService across all methods
+   - Auto-generates device IDs when needed
+
+These changes improve code maintainability, reusability, and adherence to the Single Responsibility Principle.
+
 ## Contributing
 
 Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
@@ -427,4 +445,3 @@ Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of
 ## License
 
 This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
-````

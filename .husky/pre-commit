@@ -9,16 +9,58 @@ if [[ "$current_branch" == "master" || "$current_branch" == "main" || "$current_
   exit 1
 fi
 
-# Chạy test với coverage và lấy kết quả
-coverage=$(pnpm run test:cov)
+# Chạy test với coverage
+echo "Running tests with coverage..."
+test_output=$(pnpm run test:cov)
+test_status=$?
 
-# Trích xuất phần trăm coverage từ kết quả
-coverage_percentage=$(echo "$coverage" | grep -oP 'Total\s+\d+\s+\|\s+(\d+)\s+%' | sed 's/[^0-9]*//g')
+# Extract coverage from test output as a fallback - for Jest output format
+output_coverage=$(echo "$test_output" | grep -E "All files.*[0-9]+\.[0-9]+" | grep -o "[0-9]\+\.[0-9]\+%" | sed 's/%//')
 
-# Kiểm tra nếu coverage < 80
-if [ "$coverage_percentage" -lt 80 ]; then
-  echo "Coverage quá thấp: $coverage_percentage%. Cần ít nhất 80% để tiếp tục."
+# Kiểm tra exit code của lệnh test
+if [ $test_status -ne 0 ]; then
+  echo "Tests failed! Please fix errors before committing."
   exit 1
+fi
+
+# Use output coverage if available
+if [ -n "$output_coverage" ] && [[ "$output_coverage" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  coverage_percentage=$output_coverage
+  echo "Coverage detected from test output: $coverage_percentage%"
+fi
+
+# Lấy coverage từ file lcov.info nếu có
+if [ -f "coverage/lcov.info" ]; then
+  # Extract coverage information from lcov.info
+  lines_found=$(grep -o "LF:.*" coverage/lcov.info | head -1 | cut -d':' -f2)
+  lines_hit=$(grep -o "LH:.*" coverage/lcov.info | head -1 | cut -d':' -f2)
+  
+  if [ -n "$lines_found" ] && [ -n "$lines_hit" ] && [ "$lines_found" -gt 0 ]; then
+    # Integer division in bash
+    coverage_percentage=$((lines_hit * 100 / lines_found))
+  else
+    coverage_percentage=0
+  fi
+else
+  coverage_percentage=""
+fi
+
+# Check if coverage_percentage is a valid number and not empty
+if [ -n "$coverage_percentage" ]; then
+  # Remove decimal part if present (for integer comparison)
+  if [[ "$coverage_percentage" == *"."* ]]; then
+    coverage_int=${coverage_percentage%.*}
+  else
+    coverage_int=$coverage_percentage
+  fi
+  
+  if [ "$coverage_int" -lt 80 ]; then
+    echo "Coverage quá thấp: $coverage_percentage%. Cần ít nhất 80% để tiếp tục."
+    exit 1
+  fi
+  echo "Coverage: $coverage_percentage% - Passed minimum requirement of 80%"
+else
+  echo "Could not determine coverage percentage. Proceeding with commit..."
 fi
 
 # Nếu không có lỗi, tiếp tục commit

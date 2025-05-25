@@ -1,16 +1,25 @@
-import { Repository } from 'typeorm';
-import { PaginationInput } from '../../../shared/types/graphql/inputs/pagination.input';
-import { IPaginatedType } from '../../../shared/types/graphql/outputs/pagination.response';
+import { FindOptionsOrder, FindOptionsSelect, FindOptionsWhere, Repository } from 'typeorm';
+import { PaginationDto } from '../../../presentation/dto/common/pagination.dto';
+
+export interface IPaginatedType<T> {
+    items: T[];
+    total: number;
+    page: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+}
 
 export abstract class BaseService<T> {
     constructor(protected readonly repository: Repository<T>) {}
 
     protected async paginate(
-        pagination?: PaginationInput,
+        pagination?: PaginationDto,
         options: {
             relations?: string[];
-            where?: any;
-            order?: any;
+            where?: FindOptionsWhere<T> | FindOptionsWhere<T>[];
+            order?: FindOptionsOrder<T>;
+            select?: FindOptionsSelect<T>;
         } = {},
     ): Promise<IPaginatedType<T>> {
         const {
@@ -22,15 +31,19 @@ export abstract class BaseService<T> {
 
         const skip = (page - 1) * limit;
 
-        // Merge default order with custom order if provided
-        const order = options.order ?? { [sortBy]: sortDirection };
+        // Create a properly typed order object
+        const defaultOrder = { [sortBy]: sortDirection };
+
+        // Use the provided order or the default order
+        const finalOrder = options.order || (defaultOrder as FindOptionsOrder<T>);
 
         const [items, total] = await this.repository.findAndCount({
             skip,
             take: limit,
-            order,
+            order: finalOrder,
             relations: options.relations,
             where: options.where,
+            select: options.select,
         });
 
         const totalPages = Math.ceil(total / limit);

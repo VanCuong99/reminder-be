@@ -11,12 +11,16 @@ services:
       - .env
     environment:
       - DB_HOST=postgres
+      - REDIS_HOST=redis
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - .:/app
       - /app/node_modules
+      - /app/.pnpm-store
     networks:
       - momento-network
 
@@ -37,10 +41,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - momento-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   momento-network:
-    driver: bridge 
+    driver: bridge
