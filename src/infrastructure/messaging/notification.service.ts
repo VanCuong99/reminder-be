@@ -22,6 +22,7 @@ import {
     FCM_RETRY_FACTOR,
     FCM_RETRY_MIN_TIMEOUT,
     FCM_RETRY_MAX_TIMEOUT,
+    MILLISECONDS_PER_DAY,
 } from '../../shared/constants/constants';
 
 @Injectable()
@@ -38,7 +39,7 @@ export class NotificationService implements OnModuleInit {
 
     // Notification expiration constants
     private readonly NOTIFICATION_EXPIRATION_DAYS: number;
-    private readonly MILLISECONDS_PER_DAY = 86400000; // Fixed value: milliseconds in a day
+    private readonly MILLISECONDS_PER_DAY: number;
 
     // Retry mechanism configuration
     private readonly retryAttempts: number;
@@ -77,6 +78,7 @@ export class NotificationService implements OnModuleInit {
         this.NOTIFICATION_EXPIRATION_DAYS =
             this.configService.get<number>('NOTIFICATION_EXPIRATION_DAYS') ||
             DEFAULT_EXPIRATION_DAYS;
+        this.MILLISECONDS_PER_DAY = MILLISECONDS_PER_DAY;
 
         // Initialize retry configuration
         this.retryAttempts =
@@ -227,7 +229,7 @@ export class NotificationService implements OnModuleInit {
                         bail(error);
                         return {
                             success: false,
-                            error: error.message || 'Unknown error sending notification',
+                            error: error.message ?? 'Unknown error sending notification',
                         };
                     }
                 },
@@ -1006,7 +1008,7 @@ export class NotificationService implements OnModuleInit {
             // Get tokens for all users in one batch query
             const allTokens = await this.deviceTokenService.getTokensForMultipleUsers(userIds);
 
-            if (!allTokens || !allTokens.length) {
+            if (!allTokens?.length) {
                 return { success: false, error: 'No active device tokens found for users' };
             }
 

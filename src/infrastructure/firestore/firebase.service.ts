@@ -2,15 +2,17 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
 import { Firestore } from 'firebase-admin/firestore';
+import {
+    SECONDS_PER_DAY,
+    DEFAULT_EXPIRATION_DAYS,
+    FIREBASE_RETRY_ATTEMPTS,
+    FIREBASE_RETRY_DELAY,
+} from '../../shared/constants/constants';
 
 @Injectable()
 export class FirebaseService implements OnModuleInit {
     private readonly logger = new Logger(FirebaseService.name);
     private firestore: Firestore;
-    private readonly retryAttempts = 3;
-    private readonly retryDelay = 300; // ms
-    private readonly DAYS_IN_SECONDS = 86400; // seconds in a day
-    private readonly DEFAULT_EXPIRATION_DAYS = 30;
 
     constructor(private readonly configService: ConfigService) {}
 
@@ -600,7 +602,7 @@ export class FirebaseService implements OnModuleInit {
     ): Promise<void> {
         let attempts = 0;
 
-        while (attempts < this.retryAttempts) {
+        while (attempts < FIREBASE_RETRY_ATTEMPTS) {
             try {
                 await this.firestore.runTransaction(async t => {
                     const eventRef = this.firestore.collection('events').doc(eventId);
@@ -632,8 +634,8 @@ export class FirebaseService implements OnModuleInit {
                         type: 'event_update',
                         createdAt: admin.firestore.FieldValue.serverTimestamp(),
                         expiresAt: new Date(
-                            Date.now() + this.DEFAULT_EXPIRATION_DAYS * this.DAYS_IN_SECONDS * 1000,
-                        ), // Using constants instead of hardcoded values
+                            Date.now() + DEFAULT_EXPIRATION_DAYS * SECONDS_PER_DAY * 1000,
+                        ), // Using constants directly
                     });
                 });
 
@@ -642,7 +644,7 @@ export class FirebaseService implements OnModuleInit {
             } catch (error) {
                 attempts++;
 
-                if (attempts >= this.retryAttempts) {
+                if (attempts >= FIREBASE_RETRY_ATTEMPTS) {
                     this.logger.error(
                         `Failed to update event after ${attempts} attempts: ${error.message}`,
                     );
@@ -650,9 +652,9 @@ export class FirebaseService implements OnModuleInit {
                 }
 
                 this.logger.warn(
-                    `Retrying event update (${attempts}/${this.retryAttempts}): ${error.message}`,
+                    `Retrying event update (${attempts}/${FIREBASE_RETRY_ATTEMPTS}): ${error.message}`,
                 );
-                await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempts));
+                await new Promise(resolve => setTimeout(resolve, FIREBASE_RETRY_DELAY * attempts));
             }
         }
     }

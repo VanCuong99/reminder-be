@@ -4,6 +4,8 @@ import { TokenValidationService } from './token-validation.service';
 import { BadRequestException, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../../application/services/auth/auth.service';
+import { AuthProvider, AUTH_CONSTANTS } from '../../shared/constants/auth.constants';
+import { CookieService } from '../../infrastructure/auth/services/cookie.service';
 
 // Silence all logger output for all tests
 let loggerErrorSpy: jest.SpyInstance;
@@ -25,62 +27,19 @@ afterAll(() => {
 
 describe('private helpers', () => {
     let service: TokenValidationService;
-    beforeAll(() => {
-        service = new TokenValidationService({} as any, {} as any);
-    });
-
-    describe('extractTokenFromAuthHeader (error handling)', () => {
-        it('should return null and log error if exception thrown', () => {
-            const badInput = {
-                toString: () => {
-                    throw new Error('fail');
-                },
-            };
-            // @ts-ignore
-            expect(service.extractTokenFromAuthHeader(badInput)).toBeNull();
-        });
-    });
-
-    describe('transformUserResponse', () => {
-        it('should transform user to UserResponse shape', () => {
-            // @ts-ignore
-            const user = { id: '1', email: 'a', username: 'b', role: UserRole.USER };
-            // @ts-ignore
-            expect(service['transformUserResponse'](user)).toEqual(user);
-        });
-    });
-
-    describe('getSuccessMessage', () => {
-        it('should return correct message for registration', () => {
-            // @ts-ignore
-            expect(service['getSuccessMessage']('registration')).toBe('Registration successful');
-        });
-        it('should return correct message for Google', () => {
-            // @ts-ignore
-            expect(service['getSuccessMessage']('Google')).toBe('Google login successful');
-        });
-        it('should return correct message for Facebook', () => {
-            // @ts-ignore
-            expect(service['getSuccessMessage']('Facebook')).toBe('Facebook login successful');
-        });
-        it('should return correct message for TokenRefresh', () => {
-            // @ts-ignore
-            expect(service['getSuccessMessage']('TokenRefresh')).toBe(
-                'Token refreshed successfully',
-            );
-        });
-        it('should return default message for unknown provider', () => {
-            // @ts-ignore
-            expect(service['getSuccessMessage']('other')).toBe('Login successful');
-            // @ts-ignore
-            expect(service['getSuccessMessage']()).toBe('Login successful');
-        });
-    });
-});
-describe('private helpers', () => {
-    let service: TokenValidationService;
-    beforeAll(() => {
-        service = new TokenValidationService({} as any, {} as any);
+    beforeAll(async () => {
+        const mockAuthService = { decodeToken: jest.fn() };
+        const mockConfigService = { get: jest.fn() };
+        const mockCookieService = { setAuthCookies: jest.fn(), clearAuthCookies: jest.fn() };
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [
+                TokenValidationService,
+                { provide: AuthService, useValue: mockAuthService },
+                { provide: ConfigService, useValue: mockConfigService },
+                { provide: CookieService, useValue: mockCookieService },
+            ],
+        }).compile();
+        service = module.get<TokenValidationService>(TokenValidationService);
     });
 
     describe('extractTokenFromAuthHeader (error handling)', () => {
@@ -107,28 +66,35 @@ describe('private helpers', () => {
 
     describe('getSuccessMessage', () => {
         it('should return correct message for registration', () => {
-            // @ts-ignore
-            expect(service['getSuccessMessage']('registration')).toBe('Registration successful');
+            // @ts-ignore            expect(service['getSuccessMessage'](AuthProvider.REGISTRATION)).toBe(AUTH_CONSTANTS.MESSAGES[AuthProvider.REGISTRATION]);
         });
         it('should return correct message for Google', () => {
             // @ts-ignore
-            expect(service['getSuccessMessage']('Google')).toBe('Google login successful');
+            expect(service['getSuccessMessage'](AuthProvider.GOOGLE)).toBe(
+                AUTH_CONSTANTS.MESSAGES[AuthProvider.GOOGLE],
+            );
         });
         it('should return correct message for Facebook', () => {
             // @ts-ignore
-            expect(service['getSuccessMessage']('Facebook')).toBe('Facebook login successful');
+            expect(service['getSuccessMessage'](AuthProvider.FACEBOOK)).toBe(
+                AUTH_CONSTANTS.MESSAGES[AuthProvider.FACEBOOK],
+            );
         });
         it('should return correct message for TokenRefresh', () => {
             // @ts-ignore
-            expect(service['getSuccessMessage']('TokenRefresh')).toBe(
-                'Token refreshed successfully',
+            expect(service['getSuccessMessage'](AuthProvider.TOKEN_REFRESH)).toBe(
+                AUTH_CONSTANTS.MESSAGES[AuthProvider.TOKEN_REFRESH],
             );
         });
         it('should return default message for unknown provider', () => {
             // @ts-ignore
-            expect(service['getSuccessMessage']('other')).toBe('Login successful');
+            expect(service['getSuccessMessage']('other')).toBe(
+                AUTH_CONSTANTS.MESSAGES[AuthProvider.LOCAL],
+            );
             // @ts-ignore
-            expect(service['getSuccessMessage']()).toBe('Login successful');
+            expect(service['getSuccessMessage']()).toBe(
+                AUTH_CONSTANTS.MESSAGES[AuthProvider.LOCAL],
+            );
         });
     });
 });
@@ -145,11 +111,16 @@ describe('TokenValidationService', () => {
         const mockConfigService = {
             get: jest.fn(),
         };
+        const mockCookieService = {
+            setAuthCookies: jest.fn(),
+            clearAuthCookies: jest.fn(),
+        };
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 TokenValidationService,
                 { provide: AuthService, useValue: mockAuthService },
                 { provide: ConfigService, useValue: mockConfigService },
+                { provide: CookieService, useValue: mockCookieService },
             ],
         }).compile();
 
@@ -337,13 +308,17 @@ describe('TokenValidationService', () => {
                     user: { id: '1', email: 'a', username: 'b', role: UserRole.USER, extra: 'x' },
                     tokens: { accessToken: 'at', refreshToken: 'rt', csrfToken: 'ct' },
                 };
-                const result = service.handleAuthResponse(res, authResponse, 'registration');
+                const result = service.handleAuthResponse(
+                    res,
+                    authResponse,
+                    AuthProvider.REGISTRATION,
+                );
                 expect(result).toMatchObject({
                     user: authResponse.user,
                     accessToken: 'at',
                     refreshToken: 'rt',
                     csrfToken: 'ct',
-                    message: 'Registration successful',
+                    message: AUTH_CONSTANTS.MESSAGES[AuthProvider.REGISTRATION],
                 });
             });
             it('should return refresh response with all user fields', () => {
@@ -351,13 +326,17 @@ describe('TokenValidationService', () => {
                     user: { id: '1', email: 'a', username: 'b', role: UserRole.USER, extra: 'x' },
                     tokens: { accessToken: 'at', refreshToken: 'rt', csrfToken: 'ct' },
                 };
-                const result = service.handleAuthResponse(res, authResponse, 'TokenRefresh');
+                const result = service.handleAuthResponse(
+                    res,
+                    authResponse,
+                    AuthProvider.TOKEN_REFRESH,
+                );
                 expect(result).toMatchObject({
                     user: authResponse.user,
                     accessToken: 'at',
                     refreshToken: 'rt',
                     csrfToken: 'ct',
-                    message: 'Token refreshed successfully',
+                    message: AUTH_CONSTANTS.MESSAGES[AuthProvider.TOKEN_REFRESH],
                 });
             });
             it('should return login response with selected user fields', () => {
@@ -388,7 +367,7 @@ describe('TokenValidationService', () => {
                     accessToken: 'at',
                     refreshToken: 'rt',
                     csrfToken: 'ct',
-                    message: 'Login successful',
+                    message: AUTH_CONSTANTS.MESSAGES[AuthProvider.LOCAL],
                 });
             });
             it('should return Google login message', () => {
@@ -396,16 +375,16 @@ describe('TokenValidationService', () => {
                     user: { id: '1', email: 'a', username: 'b', role: UserRole.USER },
                     tokens: { accessToken: 'at', refreshToken: 'rt', csrfToken: 'ct' },
                 };
-                const result = service.handleAuthResponse(res, authResponse, 'Google');
-                expect(result.message).toBe('Google login successful');
+                const result = service.handleAuthResponse(res, authResponse, AuthProvider.GOOGLE);
+                expect(result.message).toBe(AUTH_CONSTANTS.MESSAGES[AuthProvider.GOOGLE]);
             });
             it('should return Facebook login message', () => {
                 const authResponse = {
                     user: { id: '1', email: 'a', username: 'b', role: UserRole.USER },
                     tokens: { accessToken: 'at', refreshToken: 'rt', csrfToken: 'ct' },
                 };
-                const result = service.handleAuthResponse(res, authResponse, 'Facebook');
-                expect(result.message).toBe('Facebook login successful');
+                const result = service.handleAuthResponse(res, authResponse, AuthProvider.FACEBOOK);
+                expect(result.message).toBe(AUTH_CONSTANTS.MESSAGES[AuthProvider.FACEBOOK]);
             });
         });
 

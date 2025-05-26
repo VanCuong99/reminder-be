@@ -3,26 +3,14 @@ import { UnauthorizedException, Logger } from '@nestjs/common';
 import { LocalStrategy } from './local.strategy';
 import { AuthService } from '../../../application/services/auth/auth.service';
 import { UserRole } from '../../../shared/constants/user-role.enum';
+import { createMockUser } from '../../../test/mocks/user.mock';
 
 describe('LocalStrategy', () => {
     let strategy: LocalStrategy;
-    let authService: AuthService;
-    const mockUser = {
-        id: 'user123',
-        email: 'test@example.com',
-        username: 'testuser',
-        role: UserRole.USER,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        timezone: 'UTC',
-        notificationPrefs: {
-            email: true,
-            push: true,
-            frequency: 'immediate' as const,
-        },
-        deviceTokens: [],
-    };
+    let authService: jest.Mocked<AuthService>;
+    const mockUser = createMockUser({
+        password: undefined, // Remove password as it's not needed in validation result
+    });
 
     // Spy on Logger to prevent console output in tests
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
@@ -43,7 +31,11 @@ describe('LocalStrategy', () => {
         }).compile();
 
         strategy = module.get<LocalStrategy>(LocalStrategy);
-        authService = module.get<AuthService>(AuthService);
+        authService = module.get<AuthService>(AuthService) as jest.Mocked<AuthService>;
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
     });
 
     it('should be defined', () => {

@@ -25,7 +25,10 @@ import { RegisterDto } from '../dto/auth/register.dto';
 import { UserService } from '../../application/services/users/user.service';
 import { TimezoneService } from '../../shared/services/timezone.service';
 import { TokenValidationService } from '../../shared/services/token-validation.service';
+import { CookieService } from '../../infrastructure/auth/services/cookie.service';
+import { AuthProvider, AUTH_CONSTANTS } from '../../shared/constants/auth.constants';
 import { AuthenticatedRequest, AuthSuccessResponse } from '../interfaces/auth.interface';
+import { HTTP_HEADERS } from 'src/shared/constants/http-headers';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -38,6 +41,7 @@ export class AuthController {
         private readonly userService: UserService,
         private readonly timezoneService: TimezoneService,
         private readonly tokenValidationService: TokenValidationService,
+        private readonly cookieService: CookieService,
     ) {}
 
     @ApiOperation({ summary: 'User registration' })
@@ -56,7 +60,6 @@ export class AuthController {
         this.logger.debug(`Registration attempt for email: ${registerDto.email}`);
 
         try {
-            // Create user with UserService
             const user = await this.userService.create({
                 username: registerDto.username,
                 email: registerDto.email,
@@ -64,22 +67,19 @@ export class AuthController {
                 timezone: registerDto.timezone,
             });
 
-            // Login automatically after registration
             const result: AuthResponse = await this.authService.login({
                 email: user.email,
                 password: registerDto.password, // Need to use the plain password here
             });
 
             this.logger.debug(`Registration successful for user: ${user.email}`);
-            return this.handleAuthResponse(res, result, 'registration');
+            return this.handleAuthResponse(res, result, AuthProvider.REGISTRATION);
         } catch (error) {
             this.logger.error(`Registration failed: ${error.message}`);
             if (error instanceof BadRequestException) {
                 throw error;
             }
-            throw new BadRequestException(
-                'Registration failed. Please check your input and try again.',
-            );
+            throw new BadRequestException(AUTH_CONSTANTS.MESSAGES.ERROR.REGISTRATION_FAILED);
         }
     }
 
@@ -97,13 +97,29 @@ export class AuthController {
     ) {
         this.logger.debug(`Login attempt for: ${loginDto.email}`);
 
-        const result = await this.authService.login({
-            email: loginDto.email,
-            password: loginDto.password,
-        });
+        try {
+            const result = await this.authService.login({
+                email: loginDto.email,
+                password: loginDto.password,
+                userAgent: (() => {
+                    const ua = req.headers?.[HTTP_HEADERS.USER_AGENT];
+                    if (Array.isArray(ua)) return ua.join(', ');
+                    return ua ?? '';
+                })(),
+                ip: req.ip || req.socket?.remoteAddress || '',
+            });
 
-        this.logger.debug(`Login successful for user: ${result.user.email}`);
-        return this.handleAuthResponse(res, result);
+            this.logger.debug(`Login successful for user: ${result.user.email}`);
+            return this.handleAuthResponse(res, result, AuthProvider.LOCAL);
+        } catch (error) {
+            this.logger.error(`Login error: ${error.message}`);
+            if (error instanceof UnauthorizedException) {
+                throw error;
+            }
+            throw new UnauthorizedException(
+                error.message ?? AUTH_CONSTANTS.MESSAGES.ERROR.LOGIN_FAILED,
+            );
+        }
     }
 
     @ApiOperation({ summary: 'User logout' })
@@ -131,14 +147,14 @@ export class AuthController {
             this.tokenValidationService.clearAuthCookies(res);
 
             return {
-                message: 'Logout successful',
+                message: AUTH_CONSTANTS.MESSAGES.LOGOUT,
             };
         } catch (error) {
             this.logger.error(`Logout error: ${error.message}`);
             // Still clear cookies and return success to client
             this.tokenValidationService.clearAuthCookies(res);
             return {
-                message: 'Logout successful',
+                message: AUTH_CONSTANTS.MESSAGES.LOGOUT,
             };
         }
     }
@@ -169,24 +185,22 @@ export class AuthController {
             const refreshToken = this.tokenValidationService.extractRefreshToken(req, body);
 
             if (!refreshToken) {
-                throw new UnauthorizedException('Refresh token not provided');
+                throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.NO_AUTH_TOKEN);
             }
 
             const tokenData = this.tokenValidationService.validateAndDecodeToken(refreshToken);
             if (!tokenData?.userId || !tokenData?.tokenId) {
-                throw new UnauthorizedException('Failed to refresh token');
+                throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.REFRESH_FAILED);
             }
 
             const result = await this.authService.refreshToken(tokenData.userId, tokenData.tokenId);
 
             this.logger.debug(`Token refreshed successfully for user: ${tokenData.userId}`);
-            // Set message to 'Token refreshed successfully' for refreshToken endpoint
-            return this.handleAuthResponse(res, result, 'TokenRefresh');
+            return this.handleAuthResponse(res, result, AuthProvider.TOKEN_REFRESH);
         } catch (error) {
             this.logger.error(`Token refresh error: ${error.message}`);
-            // Clear any existing tokens on error
             this.tokenValidationService.clearAuthCookies(res);
-            throw new UnauthorizedException('Failed to refresh token');
+            throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.REFRESH_FAILED);
         }
     }
 
@@ -198,27 +212,16 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Get('me')
     async getProfile(@Req() req: AuthenticatedRequest) {
-        this.logger.debug(
-            `Auth/me endpoint accessed with headers: ${JSON.stringify({
-                auth: req.headers.authorization ? 'present' : 'absent',
-                csrf: req.headers['x-csrf-token'] ? 'present' : 'absent',
-                cookie: req.cookies?.access_token ? 'present' : 'absent',
-            })}`,
-        );
-
         try {
             if (!req.user) {
                 this.logger.warn('No user found in request after authentication');
-                throw new UnauthorizedException('Authentication failed - no user found');
+                throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.NO_USER);
             }
 
-            this.logger.debug(
-                `User found in request: ${req.user.email || req.user.id || 'unknown'}`,
-            );
             return this.tokenValidationService.transformProfileResponse(req.user);
         } catch (error) {
             this.logger.error(`Authentication error in /me endpoint: ${error.message}`);
-            throw new UnauthorizedException('Authentication failed');
+            throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.AUTH_FAILED);
         }
     }
 
@@ -271,10 +274,16 @@ export class AuthController {
         @Req() req: AuthenticatedRequest,
         @Res({ passthrough: true }) res: Response,
     ) {
-        // req.user is set by GoogleStrategy
-        const socialUser = this.tokenValidationService.validateAndTransformSocialUser(req.user);
-        const result = await this.authService.socialLogin(socialUser);
-        return this.handleAuthResponse(res, result, 'Google');
+        try {
+            const socialUser = this.tokenValidationService.validateAndTransformSocialUser(req.user);
+            const result = await this.authService.socialLogin(socialUser);
+            return this.handleAuthResponse(res, result, AuthProvider.GOOGLE);
+        } catch (error) {
+            this.logger.error(`Google auth callback error: ${error.message}`);
+            throw new UnauthorizedException(
+                AUTH_CONSTANTS.MESSAGES.ERROR.INCOMPLETE_SOCIAL_PROFILE,
+            );
+        }
     }
 
     @Get('facebook')
@@ -326,34 +335,28 @@ export class AuthController {
         @Req() req: AuthenticatedRequest,
         @Res({ passthrough: true }) res: Response,
     ) {
-        // req.user is set by FacebookStrategy
-        const socialUser = this.tokenValidationService.validateAndTransformSocialUser(req.user);
-        const result = await this.authService.socialLogin(socialUser);
-        return this.handleAuthResponse(res, result, 'Facebook');
+        try {
+            const socialUser = this.tokenValidationService.validateAndTransformSocialUser(req.user);
+            const result = await this.authService.socialLogin(socialUser);
+            return this.handleAuthResponse(res, result, AuthProvider.FACEBOOK);
+        } catch (error) {
+            this.logger.error(`Facebook auth callback error: ${error.message}`);
+            throw new UnauthorizedException(
+                AUTH_CONSTANTS.MESSAGES.ERROR.INCOMPLETE_SOCIAL_PROFILE,
+            );
+        }
     }
 
-    // Token and response handling has been moved to TokenValidationService
     private handleAuthResponse(
         res: Response,
         authResponse: AuthResponse,
-        provider?: string,
+        provider?: AuthProvider,
     ): AuthSuccessResponse {
-        // For refresh endpoint, pass provider as 'TokenRefresh' for test compatibility
-        if (
-            provider === undefined &&
-            (authResponse as any)?.tokens?.accessToken &&
-            (authResponse as any)?.tokens?.refreshToken &&
-            (authResponse as any)?.tokens?.csrfToken
-        ) {
-            // Heuristic: if this is called from refreshToken endpoint, set provider to 'TokenRefresh'
-            if (res.req && res.req.url && res.req.url.includes('/auth/refresh')) {
-                return this.tokenValidationService.handleAuthResponse(
-                    res,
-                    authResponse,
-                    'TokenRefresh',
-                );
-            }
-        }
-        return this.tokenValidationService.handleAuthResponse(res, authResponse, provider);
+        const isRefreshRequest = !provider && res.req?.url?.includes('/auth/refresh');
+        return this.tokenValidationService.handleAuthResponse(
+            res,
+            authResponse,
+            isRefreshRequest ? AuthProvider.TOKEN_REFRESH : provider,
+        );
     }
 }

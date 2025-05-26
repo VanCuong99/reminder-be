@@ -1,18 +1,9 @@
-import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-    OneToMany,
-} from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
+import { BaseModel } from './base.entity';
 import { Event } from './event.entity';
 
 @Entity()
-export class GuestDevice {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
-
+export class GuestDevice extends BaseModel {
     @Column({ unique: true })
     deviceId: string;
 
@@ -24,13 +15,4 @@ export class GuestDevice {
 
     @OneToMany(() => Event, event => event.guestDevice)
     events: Event[];
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
-
-    @Column({ default: true })
-    isActive: boolean;
 }

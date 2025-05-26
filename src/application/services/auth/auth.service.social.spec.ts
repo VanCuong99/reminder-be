@@ -7,7 +7,8 @@ import { RedisService } from '../../../infrastructure/cache/redis.service';
 import { JwtConfigService } from '../../../infrastructure/auth/services/jwt-config.service';
 import { Logger, UnauthorizedException } from '@nestjs/common';
 import { UserRole } from '../../../shared/constants/user-role.enum';
-import { User } from '../../../domain/entities/user.entity';
+import { createMockUser } from '../../../test/mocks/user.mock';
+import { AuthProvider, AUTH_CONSTANTS } from '../../../shared/constants/auth.constants';
 
 describe('AuthService - Social Login', () => {
     // Silence all logger output for all tests
@@ -31,25 +32,16 @@ describe('AuthService - Social Login', () => {
     let service: AuthService;
     let userService: jest.Mocked<UserService>;
     let jwtService: jest.Mocked<JwtService>;
-    const mockUser: User = {
-        id: '1',
+    let redisService: jest.Mocked<RedisService>;
+    let configService: jest.Mocked<ConfigService>;
+    let jwtConfigService: jest.Mocked<JwtConfigService>;
+
+    const mockUser = createMockUser({
         email: 'test@example.com',
         username: 'Test User',
-        password: '', // use empty string for social login to satisfy type
+        password: '', // empty string for social login
         role: UserRole.USER,
-        isActive: true,
-        socialId: 'social-123',
-        provider: 'google',
-        timezone: 'UTC',
-        notificationPrefs: {
-            email: true,
-            push: true,
-            frequency: 'immediate',
-        },
-        deviceTokens: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-    };
+    });
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
@@ -58,19 +50,24 @@ describe('AuthService - Social Login', () => {
                 {
                     provide: UserService,
                     useValue: {
+                        findBySocialId: jest.fn(),
                         findByEmail: jest.fn(),
                         create: jest.fn(),
+                        linkSocialAccount: jest.fn(),
+                        updateLoginMetadata: jest.fn().mockResolvedValue(mockUser),
                     },
                 },
                 {
                     provide: JwtService,
                     useValue: {
-                        sign: jest.fn().mockReturnValue('mock-token'),
+                        sign: jest.fn(),
+                        decode: jest.fn(),
                     },
                 },
                 {
                     provide: RedisService,
                     useValue: {
+                        get: jest.fn(),
                         set: jest.fn(),
                     },
                 },
@@ -84,16 +81,19 @@ describe('AuthService - Social Login', () => {
                     provide: JwtConfigService,
                     useValue: {
                         algorithm: 'RS256',
-                        accessTokenExpiration: '1h',
+                        accessTokenExpiration: '15m',
                         refreshTokenExpiration: '7d',
                     },
                 },
             ],
         }).compile();
-
-        service = module.get<AuthService>(AuthService);
+        service = module.get(AuthService);
         userService = module.get(UserService);
         jwtService = module.get(JwtService);
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
     });
 
     describe('socialLogin', () => {
@@ -102,7 +102,7 @@ describe('AuthService - Social Login', () => {
             email: 'test@example.com',
             name: 'Test User',
             avatar: 'https://example.com/avatar.jpg',
-            provider: 'google',
+            provider: AuthProvider.GOOGLE,
         };
 
         it('should login existing user with social credentials', async () => {
@@ -129,6 +129,7 @@ describe('AuthService - Social Login', () => {
                 password: null,
                 socialId: mockSocialUser.socialId,
                 provider: mockSocialUser.provider,
+                avatar: mockSocialUser.avatar,
             });
             expect(result).toHaveProperty('user');
             expect(result).toHaveProperty('tokens');
@@ -157,6 +158,91 @@ describe('AuthService - Social Login', () => {
                     role: mockUser.role,
                 }),
                 expect.any(Object),
+            );
+        });
+    });
+
+    describe('login metadata updates', () => {
+        it('should update login metadata for existing user during social login', async () => {
+            const existingUser = {
+                ...mockUser,
+                loginCount: 5,
+                lastLoginAt: new Date('2023-01-01'),
+            };
+            userService.findByEmail.mockResolvedValue(existingUser);
+            userService.updateLoginMetadata.mockResolvedValue({
+                ...existingUser,
+                loginCount: 6,
+                lastLoginAt: expect.any(Date),
+                lastLoginProvider: AuthProvider.GOOGLE,
+                failedAttempts: AUTH_CONSTANTS.DEFAULT_VALUES.FAILED_ATTEMPTS,
+            });
+
+            await service.socialLogin({
+                socialId: 'social-123',
+                email: 'test@example.com',
+                name: 'Test User',
+                provider: AuthProvider.GOOGLE,
+            });
+
+            expect(userService.updateLoginMetadata).toHaveBeenCalledWith(
+                existingUser.id,
+                expect.objectContaining({
+                    lastLoginProvider: AuthProvider.GOOGLE,
+                    loginCount: 6,
+                    lastLoginAt: expect.any(Date),
+                }),
+            );
+        });
+
+        it('should initialize login metadata for new user during social login', async () => {
+            userService.findByEmail.mockResolvedValue(null);
+            const newUser = {
+                ...mockUser,
+                id: 'new-user-id',
+                loginCount: 0,
+            };
+            userService.create.mockResolvedValue(newUser);
+            userService.updateLoginMetadata.mockResolvedValue({
+                ...newUser,
+                loginCount: 1,
+                lastLoginAt: expect.any(Date),
+                lastLoginProvider: AuthProvider.GOOGLE,
+            });
+
+            await service.socialLogin({
+                socialId: 'social-123',
+                email: 'newuser@example.com',
+                name: 'New User',
+                provider: AuthProvider.GOOGLE,
+            });
+
+            expect(userService.create).toHaveBeenCalled();
+            expect(userService.updateLoginMetadata).toHaveBeenCalledWith(
+                'new-user-id',
+                expect.objectContaining({
+                    lastLoginProvider: AuthProvider.GOOGLE,
+                    loginCount: 1,
+                    lastLoginAt: expect.any(Date),
+                }),
+            );
+        });
+
+        it('should handle login metadata update failure gracefully', async () => {
+            userService.findByEmail.mockResolvedValue(mockUser);
+            userService.updateLoginMetadata.mockRejectedValue(new Error('Update failed'));
+            const result = await service.socialLogin({
+                socialId: 'social-123',
+                email: 'test@example.com',
+                name: 'Test User',
+                provider: AuthProvider.GOOGLE,
+            });
+
+            // Should still complete login successfully even if metadata update fails
+            expect(result).toHaveProperty('user');
+            expect(result).toHaveProperty('tokens');
+            expect(loggerErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Failed to update login metadata'),
             );
         });
     });

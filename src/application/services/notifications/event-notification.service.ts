@@ -7,9 +7,6 @@ import { User } from '../../../domain/entities/user.entity';
 
 @Injectable()
 export class EventNotificationService {
-    private readonly DAYS_IN_MS = 86400000; // milliseconds in a day
-    private readonly DEFAULT_EXPIRATION_DAYS = 30;
-
     constructor(
         private readonly notificationService: NotificationService,
         private readonly userService: UserService,

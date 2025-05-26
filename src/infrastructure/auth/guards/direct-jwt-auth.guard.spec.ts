@@ -6,7 +6,8 @@ import { UserService } from '../../../application/services/users/user.service';
 import { RedisService } from '../../cache/redis.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtConfigService } from '../services/jwt-config.service';
-import { UserRole } from '../../../shared/constants/user-role.enum';
+import { createMockUser } from '../../../test/mocks/user.mock';
+import { SECONDS_PER_HOUR } from '../../../shared/constants/constants';
 
 describe('DirectJwtAuthGuard', () => {
     // Silence all logger output for all tests
@@ -35,48 +36,44 @@ describe('DirectJwtAuthGuard', () => {
     let mockContext: jest.Mocked<ExecutionContext>;
     let mockRequest: any;
 
-    const mockUser = {
-        id: '1',
-        email: 'test@example.com',
-        username: 'testuser',
-        role: UserRole.USER,
-        password: 'hashedPassword',
-        timezone: 'UTC',
-        notificationPrefs: {
-            email: true,
-            push: true,
-            frequency: 'immediate' as 'immediate' | 'daily' | 'weekly',
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-        deviceTokens: [],
-    };
-
-    const mockToken = 'valid.mock.token';
+    const mockUser = createMockUser();
+    const mockToken = 'mock.jwt.token';
     const mockPayload = {
-        sub: '1',
-        email: 'test@example.com',
-        role: UserRole.USER,
-        jti: 'token-id-123',
-        csrf: 'csrf-token-123',
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        jti: 'mock-token-id',
+        csrf: 'mock-csrf-token',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + SECONDS_PER_HOUR, // 1 hour from now
     };
 
     beforeEach(async () => {
+        mockContext = {
+            switchToHttp: jest.fn().mockReturnValue({
+                getRequest: jest.fn().mockReturnValue({}),
+            }),
+        } as unknown as jest.Mocked<ExecutionContext>;
+
+        mockRequest = {
+            headers: { authorization: 'Bearer ' + mockToken },
+            cookies: {},
+            query: {},
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 DirectJwtAuthGuard,
                 {
-                    provide: JwtService,
-                    useValue: {
-                        verify: jest.fn(),
-                        decode: jest.fn(),
-                    },
-                },
-                {
                     provide: UserService,
                     useValue: {
                         findById: jest.fn(),
+                    },
+                },
+                {
+                    provide: JwtService,
+                    useValue: {
+                        verify: jest.fn().mockReturnValue(mockPayload),
                     },
                 },
                 {
@@ -94,59 +91,28 @@ describe('DirectJwtAuthGuard', () => {
                 {
                     provide: JwtConfigService,
                     useValue: {
-                        algorithm: 'HS256',
-                        secretOrPublicKey: 'test-secret',
-                        verifyToken: jest.fn(),
-                        inspectToken: jest.fn(),
+                        publicKey: 'mock-public-key',
+                        algorithm: 'RS256',
+                        inspectToken: jest.fn().mockReturnValue({
+                            parsed: mockPayload,
+                            header: { alg: 'RS256', typ: 'JWT' },
+                            isRS256: true,
+                        }),
+                        verifyToken: jest.fn().mockReturnValue(mockPayload),
                     },
                 },
             ],
         }).compile();
 
         guard = module.get<DirectJwtAuthGuard>(DirectJwtAuthGuard);
-        userService = module.get(UserService);
-        redisService = module.get(RedisService);
-        jwtConfigService = module.get(JwtConfigService);
+        userService = module.get(UserService) as jest.Mocked<UserService>;
+        redisService = module.get(RedisService) as jest.Mocked<RedisService>;
+        jwtConfigService = module.get(JwtConfigService) as jest.Mocked<JwtConfigService>;
 
-        // Mock executionContext
-        mockRequest = {
-            headers: {
-                authorization: `Bearer ${mockToken}`,
-            },
-            cookies: {},
-            query: {},
-            path: '/test-path',
-            method: 'GET',
-        };
-
-        mockContext = {
-            switchToHttp: jest.fn().mockReturnValue({
-                getRequest: jest.fn().mockReturnValue(mockRequest),
-                getResponse: jest.fn(),
-                getNext: jest.fn(),
-            }),
-            getType: jest.fn().mockReturnValue('http'),
-            getHandler: jest.fn(),
-            getClass: jest.fn(),
-            getArgs: jest.fn(),
-            getArgByIndex: jest.fn(),
-            switchToRpc: jest.fn(),
-            switchToWs: jest.fn(),
-        } as unknown as jest.Mocked<ExecutionContext>;
-
-        // Setup default jwtConfigService responses
-        jwtConfigService.inspectToken.mockReturnValue({
-            parsed: mockPayload,
-            header: { alg: 'HS256', typ: 'JWT' },
-            isRS256: false,
-        });
-        jwtConfigService.verifyToken.mockResolvedValue(mockPayload);
-
-        // Setup default userService response
+        // Default: userService.findById returns a valid user
         userService.findById.mockResolvedValue(mockUser);
 
-        // Setup default redisService response (no blacklisted tokens)
-        redisService.get.mockResolvedValue(null);
+        mockContext.switchToHttp().getRequest = jest.fn().mockReturnValue(mockRequest);
     });
 
     afterEach(() => {
@@ -195,7 +161,7 @@ describe('DirectJwtAuthGuard', () => {
         it('should extract token from query params when authorization header and cookies are missing', async () => {
             mockRequest.headers.authorization = undefined;
             mockRequest.cookies = {};
-            mockRequest.query.access_token = mockToken;
+            mockRequest.query = { access_token: mockToken };
 
             await guard.canActivate(mockContext);
 
@@ -246,7 +212,7 @@ describe('DirectJwtAuthGuard', () => {
         });
 
         it('should throw UnauthorizedException if token is blacklisted', async () => {
-            redisService.get.mockResolvedValue(JSON.stringify(['token-id-123']));
+            redisService.get.mockResolvedValue(JSON.stringify(['mock-token-id']));
 
             await expect(guard.canActivate(mockContext)).rejects.toThrow(
                 new UnauthorizedException('Token has been revoked'),

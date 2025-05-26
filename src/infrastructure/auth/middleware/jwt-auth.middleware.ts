@@ -1,6 +1,7 @@
 import { Injectable, NestMiddleware, UnauthorizedException, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { MILLISECONDS_PER_DAY } from '../../../shared/constants/constants';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
@@ -129,7 +130,7 @@ export class JwtAuthMiddleware implements NestMiddleware {
             httpOnly: true,
             secure: secure,
             sameSite: 'strict',
-            maxAge: 24 * 60 * 60 * 1000, // 1 day in milliseconds
+            maxAge: MILLISECONDS_PER_DAY, // 1 day in milliseconds
             path: '/',
         });
     }

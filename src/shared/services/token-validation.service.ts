@@ -7,6 +7,8 @@ import {
     UserResponse,
 } from '../../application/interfaces/auth/auth-response.interface';
 import { AuthSuccessResponse } from '../../presentation/interfaces/auth.interface';
+import { AuthProvider, AUTH_CONSTANTS } from '../constants/auth.constants';
+import { CookieService } from '../../infrastructure/auth/services/cookie.service';
 
 /**
  * Service for validating various types of tokens
@@ -18,6 +20,7 @@ export class TokenValidationService {
     constructor(
         private readonly authService: AuthService,
         private readonly configService: ConfigService,
+        private readonly cookieService: CookieService,
     ) {}
 
     /**
@@ -162,65 +165,36 @@ export class TokenValidationService {
     }
 
     /**
-     * Handles the complete auth response including cookies and formatting
-     */
-    handleAuthResponse(
+     * Handles the auth response by setting cookies and formatting the response
+     * @param res Express Response object
+     * @param authResponse Auth response from the service
+     * @param provider Optional provider name for message customization
+     * @returns Formatted auth success response
+     */ handleAuthResponse(
         res: Response,
         authResponse: AuthResponse,
-        provider?: string,
+        provider?: AuthProvider,
     ): AuthSuccessResponse {
-        const { user, tokens } = authResponse;
+        // Set auth cookies using cookie service
         const isProduction = this.configService.get('NODE_ENV') === 'production';
-        // Set HTTP-only cookies for tokens
-        this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken, isProduction);
+        this.setAuthCookies(
+            res,
+            authResponse.tokens.accessToken,
+            authResponse.tokens.refreshToken,
+            isProduction,
+        );
 
-        // Custom message logic for test compatibility
-        let message: string;
-        if (provider === 'registration') message = 'Registration successful';
-        else if (provider === 'Google') message = 'Google login successful';
-        else if (provider === 'Facebook') message = 'Facebook login successful';
-        else if (provider === 'TokenRefresh') message = 'Token refreshed successfully';
-        else message = 'Login successful';
+        // Determine message based on provider
+        const message = !provider
+            ? AUTH_CONSTANTS.MESSAGES[AuthProvider.LOCAL]
+            : (AUTH_CONSTANTS.MESSAGES[provider] ?? AUTH_CONSTANTS.MESSAGES[AuthProvider.LOCAL]);
 
-        // For registration, return all user fields (for deep equality in tests)
-        if (provider === 'registration') {
-            return {
-                user,
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-                csrfToken: tokens.csrfToken,
-                message,
-            };
-        }
-
-        // For refresh, preserve all user fields if present
-        if (provider === 'TokenRefresh') {
-            return {
-                user,
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-                csrfToken: tokens.csrfToken,
-                message,
-            };
-        }
-
-        // For login and social, only include expected fields, but preserve createdAt/updatedAt/isActive if present
-        const userResponse: any = {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            role: user.role,
-        };
-        if ('createdAt' in user && user.createdAt) userResponse.createdAt = user.createdAt;
-        if ('updatedAt' in user && user.updatedAt) userResponse.updatedAt = user.updatedAt;
-        if ('isActive' in user && user.isActive !== undefined)
-            userResponse.isActive = user.isActive;
-
+        // Return success response with tokens and message
         return {
-            user: userResponse,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-            csrfToken: tokens.csrfToken,
+            user: authResponse.user,
+            accessToken: authResponse.tokens.accessToken,
+            refreshToken: authResponse.tokens.refreshToken,
+            csrfToken: authResponse.tokens.csrfToken,
             message,
         };
     }
@@ -260,30 +234,25 @@ export class TokenValidationService {
             user: userResponse,
             isAuthenticated: true,
         };
-    }
-
-    /**
+    } /**
      * Get appropriate success message based on auth provider
      */
-    private getSuccessMessage(provider?: string): string {
-        // For test compatibility, match expected test messages
-        if (provider === 'registration') return 'Registration successful';
-        if (provider === 'Google') return 'Google login successful';
-        if (provider === 'Facebook') return 'Facebook login successful';
-        if (provider === 'TokenRefresh') return 'Token refreshed successfully';
-        return 'Login successful';
+    private getSuccessMessage(provider?: AuthProvider): string {
+        if (!provider) {
+            return AUTH_CONSTANTS.MESSAGES[AuthProvider.LOCAL];
+        }
+        return AUTH_CONSTANTS.MESSAGES[provider] ?? AUTH_CONSTANTS.MESSAGES[AuthProvider.LOCAL];
     }
 
     /**
      * Validate and transform social auth user data
      * @throws UnauthorizedException if social profile data is incomplete
-     */
-    validateAndTransformSocialUser(user: any): {
+     */ validateAndTransformSocialUser(user: any): {
         socialId: string;
         email: string;
         name: string;
         avatar?: string;
-        provider: string;
+        provider: AuthProvider;
     } {
         if (!user?.socialId || !user?.name || !user?.email || !user?.provider) {
             this.logger.warn('Incomplete social profile data received');
@@ -294,7 +263,7 @@ export class TokenValidationService {
             socialId: user.socialId,
             email: user.email,
             name: user.name,
-            avatar: user.avatar,
+            avatar: user.avatar, // Changed from user.profile?.avatar to user.avatar
             provider: user.provider,
         };
     }

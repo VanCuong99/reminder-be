@@ -7,6 +7,7 @@
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
+import { MILLISECONDS_PER_DAY, DEFAULT_EXPIRATION_DAYS } from '../../shared/constants/constants';
 
 // Set up the Firebase Admin SDK
 async function initializeFirebase() {
@@ -86,7 +87,7 @@ async function setupGuestNotifications(firestore) {
                 status: 'unread',
                 type: 'system',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                expiresAt: new Date(Date.now() + 30 * 86400000), // 30 days
+                expiresAt: new Date(Date.now() + DEFAULT_EXPIRATION_DAYS * MILLISECONDS_PER_DAY), // 30 days
             });
             console.log('Created test notification');
         } else {
@@ -103,7 +104,9 @@ async function setupGuestNotifications(firestore) {
                     status: 'unread',
                     type: 'system',
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    expiresAt: new Date(Date.now() + 30 * 86400000), // 30 days
+                    expiresAt: new Date(
+                        Date.now() + DEFAULT_EXPIRATION_DAYS * MILLISECONDS_PER_DAY,
+                    ), // 30 days
                 });
                 console.log('Created test notification');
             } else {

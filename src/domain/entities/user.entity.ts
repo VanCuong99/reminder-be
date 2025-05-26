@@ -1,61 +1,47 @@
 // src/domain/entities/user.entity.ts
-import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-    OneToMany,
-} from 'typeorm';
+
+import { Entity, Column, OneToMany, OneToOne, JoinColumn } from 'typeorm';
 import { DeviceToken } from './device-token.entity';
 import { UserRole } from '../../shared/constants/user-role.enum';
+import { AuthenticatableModel } from './base.entity';
+import { Profile } from './profile.entity';
+import { Identity } from './identity.entity';
+import { SocialAccount } from './social-account.entity';
 
 @Entity()
-export class User {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
-
-    @Column()
+export class User extends AuthenticatableModel {
+    // Core account info
+    @Column({ unique: true, nullable: true })
     username: string;
 
-    @Column({ unique: true })
+    @Column({ unique: true, nullable: true })
     email: string;
 
     @Column({ nullable: true })
     password: string;
 
-    @Column({ nullable: true })
-    socialId?: string;
-
-    @Column({ nullable: true })
-    provider?: string;
-
-    @Column({
-        type: 'enum',
-        enum: UserRole,
-        default: UserRole.USER,
-    })
+    @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
     role: UserRole;
 
-    @Column({ default: 'UTC' })
+    // User settings & metadata
+    @Column({ nullable: true })
     timezone: string;
 
-    @Column({ type: 'json', nullable: true })
-    notificationPrefs: {
-        email: boolean;
-        push: boolean;
-        frequency: 'daily' | 'weekly' | 'immediate';
-    };
+    @Column({ type: 'jsonb', nullable: true })
+    notificationPrefs: Record<string, any>;
 
-    @CreateDateColumn()
-    createdAt: Date;
+    // Relationships
+    @OneToOne(() => Profile, { cascade: true })
+    @JoinColumn()
+    profile: Profile;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+    @OneToMany(() => Identity, identity => identity.user, { cascade: true })
+    identities: Identity[];
 
-    @Column({ default: true })
-    isActive: boolean;
-
+    // Example: user can have multiple device tokens
     @OneToMany(() => DeviceToken, deviceToken => deviceToken.user)
     deviceTokens: DeviceToken[];
+
+    @OneToMany(() => SocialAccount, socialAccount => socialAccount.user, { cascade: true })
+    socialAccounts: SocialAccount[];
 }

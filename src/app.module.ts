@@ -24,6 +24,7 @@ import { DeviceToken } from './domain/entities/device-token.entity';
 import { Event } from './domain/entities/event.entity';
 import { Notification } from './domain/entities/notification.entity';
 import { GuestDevice } from './domain/entities/guest-device.entity';
+import { SocialAccount } from './domain/entities/social-account.entity';
 
 // Application Services
 import { GuestDeviceModule } from './application/services/guest-device/guest-device.module';
@@ -94,7 +95,7 @@ import { ControllersModule } from './presentation/controllers.module';
                 username: configService.get('DB_USERNAME'),
                 password: configService.get('DB_PASSWORD'),
                 database: configService.get('DB_NAME'),
-                entities: [User, DeviceToken, Event, Notification, GuestDevice],
+                entities: [User, DeviceToken, Event, Notification, GuestDevice, SocialAccount],
                 synchronize: configService.get('NODE_ENV') !== 'production',
                 logging: configService.get('NODE_ENV') === 'development',
                 ssl:

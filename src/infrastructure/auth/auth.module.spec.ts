@@ -13,6 +13,7 @@ import { Logger, UnauthorizedException } from '@nestjs/common';
 import { UserService } from 'src/application/services/users/user.service';
 import { UserRole } from 'src/shared/constants/user-role.enum';
 import { TokenValidationService } from '../../shared/services/token-validation.service';
+import { CookieService } from './services/cookie.service';
 
 const { TimezoneService } = require('../../shared/services/timezone.service');
 
@@ -64,6 +65,7 @@ describe('AuthModule', () => {
         create: jest.fn(),
         findByEmail: jest.fn(),
         findById: jest.fn(),
+        updateLoginMetadata: jest.fn(),
     };
 
     beforeEach(async () => {
@@ -112,6 +114,15 @@ describe('AuthModule', () => {
                 {
                     provide: getRepositoryToken(User),
                     useValue: mockUserRepository,
+                },
+                {
+                    provide: CookieService,
+                    useValue: {
+                        setAuthCookies: jest.fn(),
+                        clearAuthCookies: jest.fn(),
+                        setAuthCookie: jest.fn(),
+                        clearAuthCookie: jest.fn(),
+                    },
                 },
                 {
                     provide: UserService,
@@ -229,6 +240,8 @@ describe('AuthModule', () => {
                 authService.login({
                     email: 'test@example.com',
                     password: 'wrong-password',
+                    userAgent: 'test-user-agent',
+                    ip: '127.0.0.1',
                 }),
             ).rejects.toThrow(UnauthorizedException);
         });
@@ -298,6 +311,10 @@ describe('AuthModule', () => {
                     role: UserRole.USER,
                     isActive: true,
                 },
+                headers: {
+                    'user-agent': 'test-user-agent',
+                },
+                ip: '127.0.0.1',
             };
 
             // Mock Response object
@@ -334,7 +351,11 @@ describe('AuthModule', () => {
                 mockResponse as any,
             );
 
-            expect(authService.login).toHaveBeenCalledWith(mockLoginDto);
+            expect(authService.login).toHaveBeenCalledWith({
+                ...mockLoginDto,
+                userAgent: 'test-user-agent',
+                ip: '127.0.0.1',
+            });
             expect(result).toEqual({
                 user: authServiceResult.user,
                 csrfToken: authServiceResult.tokens.csrfToken,

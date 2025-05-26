@@ -17,6 +17,7 @@ import { FacebookStrategy } from './strategies/facebook.strategy';
 import { AuthService } from '../../application/services/auth/auth.service';
 import { UserModule } from '../../presentation/user.module';
 import { JwtConfigService } from './services/jwt-config.service';
+import { CookieService } from './services/cookie.service';
 import { DirectJwtAuthGuard } from './guards/direct-jwt-auth.guard';
 
 import { JwtAuthMiddleware } from './middleware/jwt-auth.middleware';
@@ -44,6 +45,7 @@ export class AuthModule {
             ],
             providers: [
                 JwtConfigService,
+                CookieService,
                 AuthService,
                 LocalStrategy,
                 JwtStrategy,
@@ -56,6 +58,7 @@ export class AuthModule {
             ],
             exports: [
                 JwtModule,
+                CookieService,
                 AuthService,
                 JwtAuthGuard,
                 DirectJwtAuthGuard,

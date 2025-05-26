@@ -5,6 +5,7 @@ import { UserService } from '../../../application/services/users/user.service';
 import { UserRole } from '../../../shared/constants/user-role.enum';
 import { RedisService } from '../../cache/redis.service';
 import { JwtConfigService } from '../services/jwt-config.service';
+import { createMockUser } from '../../../test/mocks/user.mock';
 
 describe('JwtStrategy', () => {
     // Silence all logger output for all tests
@@ -26,26 +27,11 @@ describe('JwtStrategy', () => {
     });
 
     let jwtStrategy: JwtStrategy;
-    let userService: UserService;
-    let redisService: RedisService;
+    let userService: jest.Mocked<UserService>;
+    let redisService: jest.Mocked<RedisService>;
 
-    const mockUser = {
-        id: '1',
-        email: 'test@example.com',
-        role: UserRole.USER,
-        isActive: true,
-        username: 'testuser',
-        password: 'hashedpassword',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        deviceTokens: [],
-        timezone: 'UTC',
-        notificationPrefs: {
-            email: true,
-            push: true,
-            frequency: 'immediate' as 'immediate' | 'daily' | 'weekly',
-        },
-    };
+    const mockUser = createMockUser();
+    const inactiveUser = createMockUser({ isActive: false });
 
     const mockJwtPayload = {
         sub: '1',
@@ -72,10 +58,6 @@ describe('JwtStrategy', () => {
             providers: [
                 JwtStrategy,
                 {
-                    provide: JwtConfigService,
-                    useValue: mockJwtConfigService,
-                },
-                {
                     provide: UserService,
                     useValue: {
                         findById: jest.fn(),
@@ -87,6 +69,13 @@ describe('JwtStrategy', () => {
                         get: jest.fn(),
                     },
                 },
+                {
+                    provide: JwtConfigService,
+                    useValue: {
+                        secretOrPublicKey: 'mock-public-key',
+                        algorithm: 'RS256',
+                    },
+                },
             ],
         })
             .overrideProvider(JwtConfigService)
@@ -94,8 +83,12 @@ describe('JwtStrategy', () => {
             .compile();
 
         jwtStrategy = module.get<JwtStrategy>(JwtStrategy);
-        userService = module.get<UserService>(UserService);
-        redisService = module.get<RedisService>(RedisService);
+        userService = module.get(UserService) as jest.Mocked<UserService>;
+        redisService = module.get(RedisService) as jest.Mocked<RedisService>;
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
     });
 
     describe('validate', () => {
@@ -115,10 +108,6 @@ describe('JwtStrategy', () => {
         });
 
         it('should throw UnauthorizedException if user is inactive', async () => {
-            const inactiveUser = {
-                ...mockUser,
-                isActive: false,
-            };
             jest.spyOn(userService, 'findById').mockResolvedValue(inactiveUser);
             jest.spyOn(redisService, 'get').mockResolvedValue(null);
 

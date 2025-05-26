@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Algorithm } from 'jsonwebtoken';
+import { AUTH_CONSTANTS } from '../../../shared/constants/auth.constants';
 
 /**
  * Service to provide consistent JWT configuration across the application
@@ -37,9 +38,12 @@ export class JwtConfigService {
             this.logger.warn('No valid JWT configuration found! Using development secret');
         }
 
-        this._accessTokenExpiration = this.configService.get<string>('JWT_EXPIRATION') || '1h';
+        this._accessTokenExpiration =
+            this.configService.get<string>('JWT_EXPIRATION') ||
+            AUTH_CONSTANTS.TOKEN_SETTINGS.ACCESS_TOKEN_EXPIRY;
         this._refreshTokenExpiration =
-            this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
+            this.configService.get<string>('JWT_REFRESH_EXPIRATION') ||
+            AUTH_CONSTANTS.TOKEN_SETTINGS.REFRESH_TOKEN_EXPIRY;
 
         this.logger.log(`JWT configuration initialized with algorithm: ${this._algorithm}`);
     }

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcryptjs from 'bcryptjs'; // Use bcryptjs for consistency
 import { v4 as uuidv4 } from 'uuid';
+import { AuthProvider, AUTH_CONSTANTS } from '../../../shared/constants/auth.constants';
 import { RedisService } from '../../../infrastructure/cache/redis.service';
 import { UserService } from '../users/user.service';
 import { JwtPayload } from '../../../shared/types/jwt-payload.interface';
@@ -11,6 +12,8 @@ import { JwtConfigService } from '../../../infrastructure/auth/services/jwt-conf
 import { User } from '../../../domain/entities/user.entity';
 import { LoginInput } from '../../interfaces/auth/login-input.interface';
 import { AuthResponse } from '../../interfaces/auth/auth-response.interface';
+import { LoginMetadata } from '../../interfaces/auth/login-metadata.interface';
+import { SocialUserInput } from '../../interfaces/auth/social-account.interface';
 
 @Injectable()
 export class AuthService {
@@ -44,7 +47,7 @@ export class AuthService {
 
             if (!user.isActive) {
                 this.logger.warn(`Login failed - User account is inactive: ${email}`);
-                throw new UnauthorizedException('User account is inactive');
+                throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.USER_INACTIVE);
             }
 
             // Extra debugging for password
@@ -70,6 +73,27 @@ export class AuthService {
             throw error;
         }
     }
+    private async updateLoginMetadata(
+        user: Partial<User> & { id: string },
+        provider: AuthProvider,
+        metadata?: Partial<LoginMetadata>,
+    ): Promise<void> {
+        try {
+            const currentLoginCount = user.loginCount ?? AUTH_CONSTANTS.DEFAULT_VALUES.LOGIN_COUNT;
+
+            await this.userService.updateLoginMetadata(user.id, {
+                lastLoginAt: new Date(),
+                lastLoginProvider: provider,
+                loginCount: currentLoginCount + 1,
+                lastUserAgent: metadata?.lastUserAgent,
+                lastLoginIp: metadata?.lastLoginIp,
+                failedAttempts: AUTH_CONSTANTS.DEFAULT_VALUES.FAILED_ATTEMPTS, // Reset on successful login
+            });
+        } catch (error) {
+            this.logger.error(`Failed to update login metadata: ${error.message}`);
+            // Don't throw - this is not critical for the login flow
+        }
+    }
 
     async login(loginInput: LoginInput): Promise<AuthResponse> {
         try {
@@ -77,13 +101,27 @@ export class AuthService {
             const userResult = await this.validateUser(loginInput.email, loginInput.password);
 
             if (!userResult) {
-                throw new UnauthorizedException('Invalid credentials');
+                // Increment failed attempts
+                const user = await this.userService.findByEmail(loginInput.email);
+                if (user) {
+                    await this.userService.updateLoginMetadata(user.id, {
+                        lastLoginAt: new Date(),
+                        lastLoginProvider: AuthProvider.LOCAL,
+                        loginCount: user.loginCount || 0,
+                        failedAttempts: (user.failedAttempts || 0) + 1,
+                    });
+                }
+                throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.INVALID_CREDENTIALS);
             }
 
-            // Generate CSRF token for additional security
-            const csrfToken = uuidv4();
+            // Reset failed attempts and update login metadata
+            await this.updateLoginMetadata(userResult, AuthProvider.LOCAL, {
+                lastUserAgent: loginInput.userAgent,
+                lastLoginIp: loginInput.ip,
+            });
 
-            // Generate unique token ID for blacklisting
+            // Generate tokens
+            const csrfToken = uuidv4();
             const jwtId = uuidv4();
 
             const payload: JwtPayload = {
@@ -91,20 +129,15 @@ export class AuthService {
                 email: userResult.email,
                 role: userResult.role,
                 csrf: csrfToken,
-                jti: jwtId, // Add JWT ID for blacklisting capability
+                jti: jwtId,
             };
 
-            this.logger.debug(
-                `Creating tokens for user: ${userResult.email} with algorithm: ${this.jwtConfigService.algorithm}`,
-            );
-
-            // Sign access token using the consistent configuration
+            // Create tokens using the consistent configuration
             const accessToken = this.jwtService.sign(payload, {
                 algorithm: this.jwtConfigService.algorithm,
                 expiresIn: this.jwtConfigService.accessTokenExpiration,
             });
 
-            // Sign refresh token with longer expiration
             const refreshToken = this.jwtService.sign(payload, {
                 algorithm: this.jwtConfigService.algorithm,
                 expiresIn: this.jwtConfigService.refreshTokenExpiration,
@@ -147,23 +180,26 @@ export class AuthService {
                 const error = e as Error;
                 this.logger.error(`Error parsing blacklist: ${error.message}`);
                 blacklist = [];
-            }
-
-            // Add token to blacklist
+            } // Add token to blacklist
             blacklist.push(tokenId);
+
+            // Import time constants
+            const { SECONDS_PER_DAY, SECONDS_PER_HOUR } = await import(
+                '../../../shared/constants/constants'
+            );
 
             // Save updated blacklist with appropriate TTL
             const jwtExpiresIn =
                 this.configService.get('JWT_EXPIRATION') ??
                 this.configService.get('JWT_EXPIRES_IN') ??
                 '1d';
-            let ttlSeconds = 86400; // Default 1 day in seconds
+            let ttlSeconds = SECONDS_PER_DAY; // Default 1 day in seconds
 
             if (typeof jwtExpiresIn === 'string') {
                 if (jwtExpiresIn.endsWith('d')) {
-                    ttlSeconds = parseInt(jwtExpiresIn) * 86400;
+                    ttlSeconds = parseInt(jwtExpiresIn) * SECONDS_PER_DAY;
                 } else if (jwtExpiresIn.endsWith('h')) {
-                    ttlSeconds = parseInt(jwtExpiresIn) * 3600;
+                    ttlSeconds = parseInt(jwtExpiresIn) * SECONDS_PER_HOUR;
                 }
             }
 
@@ -192,12 +228,12 @@ export class AuthService {
 
             if (!user) {
                 this.logger.debug(`User not found for token refresh: ${userId}`);
-                throw new UnauthorizedException('User not found');
+                throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.INVALID_TOKEN);
             }
 
             if (!user.isActive) {
                 this.logger.debug(`Inactive user attempting token refresh: ${userId}`);
-                throw new UnauthorizedException('User account is inactive');
+                throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.USER_INACTIVE);
             }
 
             // Generate new tokens
@@ -229,7 +265,7 @@ export class AuthService {
         } catch (error: unknown) {
             const err = error as Error;
             this.logger.error(`refreshToken error: ${err.message}`, err.stack);
-            throw new UnauthorizedException('Token refresh failed');
+            throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.REFRESH_FAILED);
         }
     }
 
@@ -313,45 +349,78 @@ export class AuthService {
     /**
      * Social login handler for Google/Facebook
      * @param socialUser { socialId, email, name, avatar, provider }
-     */
-    async socialLogin(socialUser: {
-        socialId: string;
-        email: string;
-        name: string;
-        avatar?: string;
-        provider: string;
-    }): Promise<AuthResponse> {
+     */ async socialLogin(socialUser: SocialUserInput): Promise<AuthResponse> {
         try {
             this.logger.debug(
                 `Social login attempt for: ${socialUser.email} via ${socialUser.provider}`,
             );
 
-            // Try to find user by email
-            let user = await this.userService.findByEmail(socialUser.email);
+            // First check if there's an existing social account
+            const existingSocialAccount = await this.userService.findBySocialId(
+                socialUser.socialId,
+                socialUser.provider,
+            );
 
-            if (!user) {
-                this.logger.debug('User not found, creating new account');
-                // Create new user if not exists
-                user = await this.userService.create({
-                    email: socialUser.email,
-                    username: socialUser.name,
-                    password: null, // No password for social login
-                    socialId: socialUser.socialId,
-                    provider: socialUser.provider,
-                });
-                this.logger.debug(`New user created: ${user.id}`);
+            let user: User;
+
+            if (existingSocialAccount) {
+                // User exists with this social account
+                this.logger.debug(`Found existing social account for: ${socialUser.email}`);
+
+                if (!existingSocialAccount.isActive) {
+                    this.logger.warn(
+                        `Social login failed - inactive account: ${existingSocialAccount.email}`,
+                    );
+                    throw new UnauthorizedException(AUTH_CONSTANTS.MESSAGES.ERROR.USER_INACTIVE);
+                }
+
+                user = existingSocialAccount;
+            } else {
+                // Check if user exists with the same email
+                const existingUserByEmail = await this.userService.findByEmail(socialUser.email);
+
+                if (existingUserByEmail) {
+                    if (!existingUserByEmail.isActive) {
+                        this.logger.warn(
+                            `Social login failed - inactive account: ${existingUserByEmail.email}`,
+                        );
+                        throw new UnauthorizedException(
+                            AUTH_CONSTANTS.MESSAGES.ERROR.USER_INACTIVE,
+                        );
+                    }
+
+                    // Link social account to existing user
+                    await this.userService.linkSocialAccount({
+                        userId: existingUserByEmail.id,
+                        socialId: socialUser.socialId,
+                        provider: socialUser.provider,
+                        avatar: socialUser.avatar,
+                    });
+
+                    user = existingUserByEmail;
+                } else {
+                    // Create new user
+                    user = await this.userService.create({
+                        email: socialUser.email,
+                        username: socialUser.name,
+                        password: null, // No password for social login
+                        socialId: socialUser.socialId,
+                        provider: socialUser.provider,
+                        avatar: socialUser.avatar,
+                    });
+                }
             }
 
-            if (!user.isActive) {
-                this.logger.warn(`Social login failed - inactive account: ${user.email}`);
-                throw new UnauthorizedException('User account is inactive');
-            }
+            // Update login metadata
+            // Convert string provider to enum
+            const provider =
+                Object.values(AuthProvider).find(p => p === socialUser.provider) ||
+                AuthProvider.LOCAL;
+            await this.updateLoginMetadata(user, provider);
 
-            // Generate tokens
+            // Generate auth response with tokens
             const csrfToken = uuidv4();
             const jwtId = uuidv4();
-
-            this.logger.debug(`Generating tokens for user: ${user.id}`);
 
             const payload: JwtPayload = {
                 sub: user.id,
@@ -370,8 +439,6 @@ export class AuthService {
                 algorithm: this.jwtConfigService.algorithm,
                 expiresIn: this.jwtConfigService.refreshTokenExpiration,
             });
-
-            this.logger.debug(`Social login successful for user: ${user.email}`);
 
             return {
                 user: {

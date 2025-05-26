@@ -19,8 +19,6 @@ import { EventFilterOptions } from '../../interfaces/events/event-filter-options
 @Injectable()
 export class EventService {
     private readonly logger = new Logger(EventService.name);
-    private readonly DAYS_IN_MS = 86400000; // milliseconds in a day
-    private readonly DEFAULT_EXPIRATION_DAYS = 30;
 
     constructor(
         private readonly firebaseService: FirebaseService,

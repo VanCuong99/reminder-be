@@ -5,13 +5,20 @@ import { NotificationService } from '../../../infrastructure/messaging/notificat
 import { Event } from '../../../domain/entities/event.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+    HOURS_PER_DAY,
+    SECONDS_PER_MINUTE,
+    MINUTES_PER_HOUR,
+    MILLISECONDS_PER_DAY,
+} from '../../../shared/constants/constants';
 
 @Injectable()
 export class ReminderService {
     private readonly logger = new Logger(ReminderService.name);
     private readonly reminderPrefix = 'event:reminder:';
     private readonly trackingPrefix = 'event:tracking:';
-    private readonly reminderExpiration = 60 * 60 * 24 * 365; // 1 year in seconds
+    private readonly reminderExpiration =
+        SECONDS_PER_MINUTE * MINUTES_PER_HOUR * HOURS_PER_DAY * 365; // 1 year in seconds
 
     constructor(
         private readonly redisService: RedisService,
@@ -56,7 +63,7 @@ export class ReminderService {
             // Process each reminder setting
             for (const daysBeforeEvent of reminderSettings) {
                 // Calculate when to trigger reminder
-                const daysInMs = daysBeforeEvent * 24 * 60 * 60 * 1000;
+                const daysInMs = daysBeforeEvent * MILLISECONDS_PER_DAY;
                 const reminderTime = eventTime - daysInMs;
 
                 // Skip if reminder time is in the past

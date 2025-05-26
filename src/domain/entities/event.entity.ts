@@ -1,12 +1,5 @@
-import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-    ManyToOne,
-    JoinColumn,
-} from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseModel } from './base.entity';
 import { User } from './user.entity';
 import { GuestDevice } from './guest-device.entity';
 
@@ -20,10 +13,7 @@ export enum EventCategory {
 }
 
 @Entity()
-export class Event {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
-
+export class Event extends BaseModel {
     @Column()
     name: string;
 
@@ -68,15 +58,6 @@ export class Event {
 
     @Column({ nullable: true })
     sourceDeviceId: string;
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
-
-    @Column({ default: true })
-    isActive: boolean;
 
     // Helper method to determine if event belongs to authenticated user
     isAuthenticatedUserEvent(): boolean {

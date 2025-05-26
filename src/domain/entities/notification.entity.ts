@@ -1,12 +1,5 @@
-import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-    ManyToOne,
-    JoinColumn,
-} from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseModel } from './base.entity';
 import { User } from './user.entity';
 import { Event } from './event.entity';
 
@@ -23,10 +16,7 @@ export enum NotificationType {
 }
 
 @Entity()
-export class Notification {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
-
+export class Notification extends BaseModel {
     @Column()
     title: string;
 
@@ -63,13 +53,4 @@ export class Notification {
 
     @Column({ type: 'timestamptz', nullable: true })
     expiresAt: Date;
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
-
-    @Column({ default: true })
-    isActive: boolean;
 }

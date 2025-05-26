@@ -18,6 +18,7 @@ import { DeviceToken } from '../domain/entities/device-token.entity';
 import { Notification } from '../domain/entities/notification.entity';
 import { GuestDevice } from '../domain/entities/guest-device.entity';
 import { ConfigService, ConfigModule } from '@nestjs/config';
+import { SocialAccount } from '../domain/entities/social-account.entity';
 import { JwtConfigService } from '../infrastructure/auth/services/jwt-config.service';
 import { EventService } from '../application/services/events/event.service';
 import { ReminderService } from '../application/services/notifications/reminder.service';
@@ -58,6 +59,8 @@ describe('ControllersModule', () => {
             .overrideProvider(getRepositoryToken(Notification))
             .useValue(mockRepository)
             .overrideProvider(getRepositoryToken(GuestDevice))
+            .useValue(mockRepository)
+            .overrideProvider(getRepositoryToken(SocialAccount))
             .useValue(mockRepository)
             .overrideProvider(DataSource)
             .useValue(mockDataSource)
