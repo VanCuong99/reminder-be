@@ -31,7 +31,7 @@ export class User extends AuthenticatableModel {
     notificationPrefs: Record<string, any>;
 
     // Relationships
-    @OneToOne(() => Profile, { cascade: true })
+    @OneToOne(() => Profile, profile => profile.user, { cascade: true, eager: true })
     @JoinColumn()
     profile: Profile;
 

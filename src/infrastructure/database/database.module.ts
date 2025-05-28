@@ -1,12 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { User } from '../../domain/entities/user.entity';
-import { SocialAccount } from '../../domain/entities/social-account.entity';
-import { DeviceToken } from '../../domain/entities/device-token.entity';
-import { Event } from '../../domain/entities/event.entity';
-import { GuestDevice } from '../../domain/entities/guest-device.entity';
-import { Notification } from '../../domain/entities/notification.entity';
+import { join } from 'path';
 
 @Module({
     imports: [
@@ -20,7 +15,7 @@ import { Notification } from '../../domain/entities/notification.entity';
                 username: configService.get('DB_USERNAME'),
                 password: configService.get('DB_PASSWORD'),
                 database: configService.get('DB_NAME'),
-                entities: [User, SocialAccount, DeviceToken, Event, GuestDevice, Notification],
+                entities: [join(__dirname, '../../domain/entities/**/*.entity{.ts,.js}')],
                 migrations: ['dist/infrastructure/database/migrations/*{.ts,.js}'],
                 synchronize: configService.get('NODE_ENV') === 'development',
                 logging: configService.get('NODE_ENV') === 'development',

@@ -1,4 +1,6 @@
-// src/main.ts
+// Import crypto polyfill BEFORE all other imports
+import './shared/utils/crypto-polyfill';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';

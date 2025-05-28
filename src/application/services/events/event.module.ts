@@ -11,6 +11,7 @@ import { ReminderModule } from '../notifications/reminder.module';
 import { DeviceTokenModule } from '../device-token/device-token.module';
 import { NotificationModule } from '../../../infrastructure/messaging/notification.module';
 import { SharedServicesModule } from '../../../shared/services/shared-services.module';
+import { EventNotificationModule } from '../notifications/event-notification.module';
 
 @Module({
     imports: [
@@ -21,6 +22,7 @@ import { SharedServicesModule } from '../../../shared/services/shared-services.m
         DeviceTokenModule,
         NotificationModule,
         SharedServicesModule,
+        EventNotificationModule,
     ],
     providers: [EventService],
     exports: [EventService],

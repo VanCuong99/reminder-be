@@ -1,5 +1,6 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToOne } from 'typeorm';
 import { BaseModel } from './base.entity';
+import { User } from './user.entity';
 
 @Entity()
 export class Profile extends BaseModel {
@@ -11,7 +12,6 @@ export class Profile extends BaseModel {
 
     @Column({ type: 'text', nullable: true })
     bio: string;
-
     @Column({ nullable: true })
     timezone: string;
 
@@ -25,4 +25,6 @@ export class Profile extends BaseModel {
         theme: string;
         language: string;
     };
+    @OneToOne(() => User, user => user.profile)
+    user: User;
 }
