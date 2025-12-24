@@ -8,5 +8,5 @@
     "arrowParens": "avoid",
     "bracketSameLine": false,
     "endOfLine": "auto",
-    "spaceBeforeFunctionParen": true
+    
 }
