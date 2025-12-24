@@ -1,4 +1,4 @@
-# Momento Backend
+# remider Backend
 
 Day counter & reminder application built with NestJS, REST API, TypeORM, and PostgreSQL.
 
